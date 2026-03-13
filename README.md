@@ -22,6 +22,7 @@ The relevant parameters are:
 - max_charge_rate_kw: how fast the battery can charge in kw - must be floating point number (with a decimal point e.g. 5.0)
 - efficiency - the round trip efficiency of the battery (0-1). This factor is applied on discharging the battery.
 - energy_tariff - (optional) the sensor that tracks the energy tarriff - units not supported at present.
+- update_frequency - the maximum interval between updates. Default (and recommended) to 60 seconds. Faster updates don't improve accuracy.
 
 ```yaml
 battery_sim:
