@@ -54,6 +54,9 @@ from .const import (
     MODE_FULL,
     MODE_EMPTY,
     BATTERY_CYCLES,
+    BATTERY_DEGRADATION,
+    CONF_END_OF_LIFE_DEGRADATION,
+    CONF_RATED_BATTERY_CYCLES,
     MESSAGE_TYPE_BATTERY_UPDATE,
     SENSOR_ID,
 )
@@ -132,6 +135,7 @@ async def define_sensors(hass, handle):
         )
 
     sensors.append(DisplayOnlySensor(handle, BATTERY_CYCLES, None, None))
+    sensors.append(DisplayOnlySensor(handle, BATTERY_DEGRADATION, None, None))
 
     sensors.append(
         DisplayOnlySensor(
@@ -341,7 +345,7 @@ class SimulatedBattery(RestoreEntity, SensorEntity):
         state = await self.async_get_last_state()
         if state:
             self.handle._charge_state = min(
-                float(state.state), self.handle._battery_size
+                float(state.state), self.handle.current_max_capacity
             )
             if ATTR_DATE_RECORDING_STARTED in state.attributes:
                 self.handle._date_recording_started = state.attributes[
@@ -414,6 +418,8 @@ class SimulatedBattery(RestoreEntity, SensorEntity):
             CONF_BATTERY_EFFICIENCY: float(self.handle._battery_discharge_efficiency),
             CONF_BATTERY_MAX_DISCHARGE_RATE: float(self.handle._max_discharge_rate),
             CONF_BATTERY_MAX_CHARGE_RATE: float(self.handle._max_charge_rate),
+            CONF_RATED_BATTERY_CYCLES: float(self.handle._rated_battery_cycles),
+            CONF_END_OF_LIFE_DEGRADATION: float(self.handle._end_of_life_degradation),
             ATTR_SOURCE_ID: sensor_list,
         }
 
