@@ -33,6 +33,8 @@ CONF_ENERGY_TARIFF = "energy_tariff"
 CONF_ENERGY_IMPORT_TARIFF = "energy_import_tariff"
 CONF_ENERGY_EXPORT_TARIFF = "energy_export_tariff"
 CONF_UNIQUE_NAME = "unique_name"
+CONF_RATED_BATTERY_CYCLES = "rated_battery_cycles"
+CONF_END_OF_LIFE_DEGRADATION = "end_of_life_degradation"
 CONF_UPDATE_FREQUENCY = "update_frequency"
 ATTR_VALUE = "value"
 METER_TYPE = "type_of_energy_meter"
@@ -86,6 +88,7 @@ RESET_BATTERY = "reset_battery"
 DEFAULT_MODE = "default_mode"
 PERCENTAGE_ENERGY_IMPORT_SAVED = "percentage_import_energy_saved"
 BATTERY_CYCLES = "battery_cycles"
+BATTERY_DEGRADATION = "battery_degradation"
 SENSOR_ID = "sensor_id"
 SENSOR_TYPE = "sensor_type"
 TARIFF = "tariff_sensor_or_value"
@@ -352,4 +355,3 @@ BATTERY_OPTIONS = {
     },
     "Custom": {},
 }
-

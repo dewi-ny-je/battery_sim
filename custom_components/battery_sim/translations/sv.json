@@ -22,7 +22,9 @@
           "max_discharge_rate_kw": "Max urladdningshastighet i kW",
           "max_charge_rate_kw": "Max laddningshastighet i kW",
           "discharge_efficiency": "Urladdningseffektivitet (0 till 1)",
-          "charge_efficiency": "Laddningseffektivitet (0 till 1)"
+          "charge_efficiency": "Laddningseffektivitet (0 till 1)",
+          "rated_battery_cycles": "Nominella battericykler",
+          "end_of_life_degradation": "Kapacitet vid slutet av livslängden (0 till 1)"
         },
         "description": "Ställ in specifikationerna för batteriet."
       },
@@ -65,6 +67,20 @@
         "charge_state": {
           "name": "Laddningsnivå",
           "description": "Värde på laddning i kWh"
+        }
+      }
+    },
+    "set_battery_cycles": {
+      "name": "Ange battericykler",
+      "description": "Ställ in simulerade battericykler för en specifik batterienhet",
+      "fields": {
+        "device_id": {
+          "name": "Målbatterienhet",
+          "description": "Enheten vars battericykler ska ställas in"
+        },
+        "battery_cycles": {
+          "name": "Battericykler",
+          "description": "Antal cykler att tillämpa"
         }
       }
     }
