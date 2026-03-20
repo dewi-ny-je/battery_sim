@@ -22,8 +22,8 @@
           "size_kwh": "Batteriegröße in kWh",
           "max_discharge_rate_kw": "Maximale Entladerate in kW",
           "max_charge_rate_kw": "Maximale Laderate in kW",
-          "discharge_efficiency": "Entladewirkungsgrad (0 bis 1)",
-          "charge_efficiency": "Ladewirkungsgrad (0 bis 1)",
+          "discharge_efficiency": "Entladewirkungsgrad oder Kurve (z. B. 0.95 oder 0:0.9, 5:0.95)",
+          "charge_efficiency": "Ladewirkungsgrad oder Kurve (z. B. 0.95 oder 0:0.9, 5:0.95)",
           "rated_battery_cycles": "Nennzyklen der Batterie",
           "end_of_life_degradation": "Kapazität am Ende der Lebensdauer (0 bis 1)"
         },
@@ -95,8 +95,8 @@
           "size_kwh": "Batteriegröße in kWh",
           "max_discharge_rate_kw": "Maximale Entladerate in kW",
           "max_charge_rate_kw": "Maximale Laderate in kW",
-          "discharge_efficiency": "Entladewirkungsgrad (0 bis 1)",
-          "charge_efficiency": "Ladewirkungsgrad (0 bis 1)",
+          "discharge_efficiency": "Entladewirkungsgrad oder Kurve (z. B. 0.95 oder 0:0.9, 5:0.95)",
+          "charge_efficiency": "Ladewirkungsgrad oder Kurve (z. B. 0.95 oder 0:0.9, 5:0.95)",
           "rated_battery_cycles": "Nennzyklen der Batterie",
           "end_of_life_degradation": "Kapazität am Ende der Lebensdauer (0 bis 1)"
         }

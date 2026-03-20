@@ -31,6 +31,8 @@ from .const import (
     ATTR_MONEY_SAVED,
     ATTR_MONEY_SAVED_IMPORT,
     ATTR_MONEY_SAVED_EXPORT,
+    ATTR_LAST_CHARGE_EFFICIENCY,
+    ATTR_LAST_DISCHARGE_EFFICIENCY,
     ATTR_SOURCE_ID,
     ATTR_STATUS,
     ATTR_ENERGY_SAVED,
@@ -123,6 +125,10 @@ async def define_sensors(hass, handle):
         DisplayOnlySensor(
             handle, DISCHARGING_RATE, SensorDeviceClass.POWER, UnitOfPower.KILO_WATT
         )
+    )
+    sensors.append(DisplayOnlySensor(handle, ATTR_LAST_CHARGE_EFFICIENCY, None, None))
+    sensors.append(
+        DisplayOnlySensor(handle, ATTR_LAST_DISCHARGE_EFFICIENCY, None, None)
     )
     for input in handle._inputs:
         sensors.append(
@@ -252,6 +258,11 @@ class DisplayOnlySensor(RestoreEntity, SensorEntity):
     @property
     def state_class(self):
         """Return the device class of the sensor."""
+        if self._sensor_type in [
+            ATTR_LAST_CHARGE_EFFICIENCY,
+            ATTR_LAST_DISCHARGE_EFFICIENCY,
+        ]:
+            return SensorStateClass.MEASUREMENT
         return SensorStateClass.TOTAL
 
     @property
@@ -413,9 +424,9 @@ class SimulatedBattery(RestoreEntity, SensorEntity):
             ATTR_CHARGE_PERCENTAGE: int(self.handle._charge_percentage),
             ATTR_DATE_RECORDING_STARTED: self.handle._date_recording_started,
             CONF_BATTERY_SIZE: self.handle._battery_size,
-            CONF_BATTERY_DISCHARGE_EFFICIENCY: float(self.handle._battery_discharge_efficiency),
-            CONF_BATTERY_CHARGE_EFFICIENCY: float(self.handle._battery_charge_efficiency),
-            CONF_BATTERY_EFFICIENCY: float(self.handle._battery_discharge_efficiency),
+            CONF_BATTERY_DISCHARGE_EFFICIENCY: self.handle._battery_discharge_efficiency,
+            CONF_BATTERY_CHARGE_EFFICIENCY: self.handle._battery_charge_efficiency,
+            CONF_BATTERY_EFFICIENCY: self.handle._battery_discharge_efficiency,
             CONF_BATTERY_MAX_DISCHARGE_RATE: float(self.handle._max_discharge_rate),
             CONF_BATTERY_MAX_CHARGE_RATE: float(self.handle._max_charge_rate),
             CONF_RATED_BATTERY_CYCLES: float(self.handle._rated_battery_cycles),

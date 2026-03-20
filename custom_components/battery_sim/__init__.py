@@ -11,7 +11,11 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import discovery
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.start import async_at_start
-from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
+from homeassistant.helpers.event import (
+    async_call_later,
+    async_track_state_change_event,
+    async_track_time_interval,
+)
 from homeassistant.helpers.dispatcher import dispatcher_send, async_dispatcher_connect
 
 from homeassistant.const import (
@@ -30,6 +34,8 @@ from .const import (
     ATTR_MONEY_SAVED_EXPORT,
     ATTR_MONEY_SAVED_IMPORT,
     ATTR_MONEY_SAVED,
+    ATTR_LAST_CHARGE_EFFICIENCY,
+    ATTR_LAST_DISCHARGE_EFFICIENCY,
     BATTERY_DEGRADATION,
     BATTERY_CYCLES,
     BATTERY_MODE,
@@ -66,6 +72,7 @@ from .const import (
     MODE_FORCE_DISCHARGING,
     MODE_FULL,
     MODE_IDLE,
+    MINIMUM_UPDATE_INTERVAL_SECONDS,
     NO_TARIFF_INFO,
     OVERRIDE_CHARGING,
     PAUSE_BATTERY,
@@ -78,7 +85,12 @@ from .const import (
     EXPORT,
     SIMULATED_SENSOR,
 )
-from .helpers import generate_input_list
+from .helpers import (
+    generate_input_list,
+    interpolate_efficiency,
+    parse_efficiency_curve,
+    validate_efficiency_config,
+)
 
 BATTERY_CONFIG_SCHEMA = vol.Schema(
     vol.All(
@@ -92,9 +104,15 @@ BATTERY_CONFIG_SCHEMA = vol.Schema(
             vol.Required(CONF_BATTERY_SIZE): vol.All(float),
             vol.Required(CONF_BATTERY_MAX_DISCHARGE_RATE): vol.All(float),
             vol.Optional(CONF_BATTERY_MAX_CHARGE_RATE, default=1.0): vol.All(float),
-            vol.Optional(CONF_BATTERY_DISCHARGE_EFFICIENCY): vol.All(float),
-            vol.Optional(CONF_BATTERY_CHARGE_EFFICIENCY): vol.All(float),
-            vol.Optional(CONF_BATTERY_EFFICIENCY, default=1.0): vol.All(float),
+            vol.Optional(CONF_BATTERY_DISCHARGE_EFFICIENCY): vol.Any(
+                vol.Coerce(float), vol.All(cv.string, validate_efficiency_config)
+            ),
+            vol.Optional(CONF_BATTERY_CHARGE_EFFICIENCY): vol.Any(
+                vol.Coerce(float), vol.All(cv.string, validate_efficiency_config)
+            ),
+            vol.Optional(CONF_BATTERY_EFFICIENCY, default=1.0): vol.Any(
+                vol.Coerce(float), vol.All(cv.string, validate_efficiency_config)
+            ),
             vol.Optional(CONF_RATED_BATTERY_CYCLES, default=6000): vol.All(
                 vol.Coerce(float), vol.Range(min=1)
             ),
@@ -245,6 +263,9 @@ async def async_unload_entry(hass, config_entry):
         if listener is not None:
             outcome = listener()
             _LOGGER.warning(f"unloading listener: {outcome}")
+    if handle._pending_update_cancel is not None:
+        handle._pending_update_cancel()
+        handle._pending_update_cancel = None
 
     _LOGGER.debug("Unload integration")
     if unload_ok:
@@ -279,6 +300,7 @@ class SimulatedBatteryHandle:
         self._last_import_reading_sensor_data: str = None
         self._last_export_reading_sensor_data: str = None
         self._listeners = []
+        self._pending_update_cancel = None
 
         self._battery_size = config[CONF_BATTERY_SIZE]
         self._rated_battery_cycles = config.get(CONF_RATED_BATTERY_CYCLES, 6000.0)
@@ -292,7 +314,13 @@ class SimulatedBatteryHandle:
             CONF_BATTERY_DISCHARGE_EFFICIENCY, default_discharge_efficiency
         )
         self._battery_charge_efficiency = config.get(
-            CONF_BATTERY_CHARGE_EFFICIENCY, 1.0
+            CONF_BATTERY_CHARGE_EFFICIENCY, default_discharge_efficiency
+        )
+        self._battery_discharge_efficiency_curve = parse_efficiency_curve(
+            self._battery_discharge_efficiency
+        )
+        self._battery_charge_efficiency_curve = parse_efficiency_curve(
+            self._battery_charge_efficiency
         )
         if CONF_INPUT_LIST in config:
             self._inputs = config[CONF_INPUT_LIST]
@@ -318,6 +346,8 @@ class SimulatedBatteryHandle:
             ATTR_MONEY_SAVED_EXPORT: 0.0,
             BATTERY_CYCLES: 0.0,
             BATTERY_DEGRADATION: 1.0,
+            ATTR_LAST_CHARGE_EFFICIENCY: self._battery_charge_efficiency_curve[0][1],
+            ATTR_LAST_DISCHARGE_EFFICIENCY: self._battery_discharge_efficiency_curve[0][1],
         }
         for input_details in self._inputs:
             self._sensors[input_details[SIMULATED_SENSOR]] = None
@@ -428,11 +458,7 @@ class SimulatedBatteryHandle:
     @callback
     def async_periodic_update(self, now):
         """Update battery on a fixed cadence using accumulated readings."""
-        self.update_battery(
-            self._accumulated_import_reading, self._accumulated_export_reading
-        )
-        self._accumulated_export_reading = 0.0
-        self._accumulated_import_reading = 0.0
+        self._async_maybe_update_battery()
 
     @callback
     def async_reading_handler(
@@ -549,11 +575,39 @@ class SimulatedBatteryHandle:
     @callback
     def async_trigger_update(self):
         """Apply pending readings and current controls immediately."""
+        self._async_maybe_update_battery()
+
+    def _async_maybe_update_battery(self):
+        """Apply pending readings once the minimum update interval has elapsed."""
+        elapsed_seconds = time.time() - self._last_battery_update_time
+        if elapsed_seconds < MINIMUM_UPDATE_INTERVAL_SECONDS:
+            delay = MINIMUM_UPDATE_INTERVAL_SECONDS - elapsed_seconds
+            if self._pending_update_cancel is None:
+                _LOGGER.debug(
+                    "(%s) Delaying battery update by %.3f seconds to satisfy minimum interval.",
+                    self._name,
+                    delay,
+                )
+                self._pending_update_cancel = async_call_later(
+                    self._hass, delay, self._async_delayed_update
+                )
+            return
+
+        if self._pending_update_cancel is not None:
+            self._pending_update_cancel()
+            self._pending_update_cancel = None
+
         self.update_battery(
             self._accumulated_import_reading, self._accumulated_export_reading
         )
         self._accumulated_export_reading = 0.0
         self._accumulated_import_reading = 0.0
+
+    @callback
+    def _async_delayed_update(self, _now):
+        """Run a delayed update created to enforce the minimum update interval."""
+        self._pending_update_cancel = None
+        self._async_maybe_update_battery()
 
     @property
     def degradation_factor(self) -> float:
@@ -616,7 +670,7 @@ class SimulatedBatteryHandle:
         )
         available_capacity_to_discharge = max(
             float(self._charge_state) - min_discharge_soc_capacity, 0
-        ) * float(self._battery_discharge_efficiency)
+        )
         
         if self._switches[PAUSE_BATTERY] or self._battery_mode == PAUSE_BATTERY:
             _LOGGER.debug("(%s) Battery paused.", self._name)
@@ -689,6 +743,52 @@ class SimulatedBatteryHandle:
 
 
 
+        interval_hours = max(time_since_last_battery_update / 3600, 1 / 3600)
+        requested_charge_power = (
+            amount_to_charge / interval_hours if amount_to_charge > 0 else 0.0
+        )
+        requested_discharge_power = (
+            amount_to_discharge / interval_hours if amount_to_discharge > 0 else 0.0
+        )
+        charge_efficiency = interpolate_efficiency(
+            self._battery_charge_efficiency_curve, requested_charge_power
+        )
+        discharge_efficiency = interpolate_efficiency(
+            self._battery_discharge_efficiency_curve, requested_discharge_power
+        )
+        self._sensors[ATTR_LAST_CHARGE_EFFICIENCY] = charge_efficiency
+        self._sensors[ATTR_LAST_DISCHARGE_EFFICIENCY] = discharge_efficiency
+
+        if amount_to_charge > 0:
+            amount_to_charge = min(
+                amount_to_charge,
+                available_capacity_to_charge / max(charge_efficiency, 0.000001),
+            )
+        if amount_to_discharge > 0:
+            amount_to_discharge = min(
+                amount_to_discharge,
+                available_capacity_to_discharge * discharge_efficiency,
+            )
+
+        if self._battery_mode == OVERRIDE_CHARGING:
+            net_export = max(export_amount - amount_to_charge, 0)
+            net_import = max(amount_to_charge - export_amount, 0) + import_amount
+        elif self._battery_mode == FORCE_DISCHARGE:
+            net_export = max(amount_to_discharge - import_amount, 0) + export_amount
+            net_import = max(import_amount - amount_to_discharge, 0)
+        elif self._battery_mode == CHARGE_ONLY:
+            net_import = import_amount
+            net_export = export_amount - amount_to_charge
+        elif self._battery_mode == DISCHARGE_ONLY:
+            net_import = import_amount - amount_to_discharge
+            net_export = export_amount
+        elif self._switches[PAUSE_BATTERY] or self._battery_mode == PAUSE_BATTERY:
+            net_export = export_amount
+            net_import = import_amount
+        else:
+            net_import = import_amount - amount_to_discharge
+            net_export = export_amount - amount_to_charge
+
         current_import_tariff = self.get_tariff_information(
             self._last_import_reading_sensor_data
         )
@@ -711,8 +811,8 @@ class SimulatedBatteryHandle:
 
         self._charge_state = (
             float(self._charge_state)
-            + (amount_to_charge * float(self._battery_charge_efficiency))
-            - (amount_to_discharge / float(self._battery_discharge_efficiency))
+            + (amount_to_charge * charge_efficiency)
+            - (amount_to_discharge / max(discharge_efficiency, 0.000001))
         )
 
         self._sensors[ATTR_ENERGY_SAVED] += import_amount - net_import
@@ -729,12 +829,8 @@ class SimulatedBatteryHandle:
         self._sensors[ATTR_ENERGY_BATTERY_IN] += amount_to_charge
         self._sensors[ATTR_ENERGY_BATTERY_OUT] += amount_to_discharge
 
-        self._sensors[CHARGING_RATE] = amount_to_charge / (
-            time_since_last_battery_update / 3600
-        )
-        self._sensors[DISCHARGING_RATE] = amount_to_discharge / (
-            time_since_last_battery_update / 3600
-        )
+        self._sensors[CHARGING_RATE] = amount_to_charge / interval_hours
+        self._sensors[DISCHARGING_RATE] = amount_to_discharge / interval_hours
         self._sensors[BATTERY_CYCLES] = (
             self._sensors[ATTR_ENERGY_BATTERY_IN] / self._battery_size
         )
