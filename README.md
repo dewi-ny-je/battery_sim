@@ -33,7 +33,8 @@ battery_sim:
     size_kwh: 13.5
     max_discharge_rate_kw: 5.0
     max_charge_rate_kw: 3.68
-    efficiency: 0.9
+    discharge_efficiency: 0.95
+    charge_efficiency: 0.95
     energy_tariff: 0.184
   lg_chem_resu10h:
     name: LG Chem
@@ -42,7 +43,8 @@ battery_sim:
     size_kwh: 9.3
     max_discharge_rate_kw: 5.0
     max_charge_rate_kw: 3.3
-    efficiency: 0.95
+    discharge_efficiency: 0.795
+    charge_efficiency: 0.975
   sonnen_eco:
     name: Sonnen Eco
     import_sensor: sensor.circuitsetup_cumulative_import_energy_kwh
@@ -50,7 +52,8 @@ battery_sim:
     size_kwh: 5.0
     max_discharge_rate_kw: 2.5
     max_charge_rate_kw: 2.5
-    efficiency: 0.9
+    discharge_efficiency: 0.95
+    charge_efficiency: 0.95
   pika_harbour:
     name: Pika Harbour
     import_sensor: sensor.circuitsetup_cumulative_import_energy_kwh
@@ -58,7 +61,8 @@ battery_sim:
     size_kwh: 8.6
     max_discharge_rate_kw: 4.2
     max_charge_rate_kw: 4.2
-    efficiency: 0.965
+    discharge_efficiency: 0.985
+    charge_efficiency: 0.985
    ```
 
 ## Battery Efficiencies
@@ -71,6 +75,15 @@ discharge efficiency for 800-2500 W which at very low power levels (100-150 W) c
 
 When reading a datasheet to decide which value you want to use be smart: sometimes a high efficiency is given but it refers only to the inverter
 (so, from charge in the battery to AC), omitting completely the charge efficiency (DC to battery, or AC to battery). Be conservative.
+
+## Battery degradation
+
+This integration models the degradation of the battery linearly, from 100% usable capacity (no degradation) at 0 cycles and (by default)
+80% usable capacity at 6000 cycles. The values can be provided in the settings.
+
+The state of charge (SOC) is not limited progressively, the capacity associated with 100% SOC simply decreases over time.
+
+A new action is provided to manually set the current number of battery cycles, to simulate immediately old batteries.
 
 ## Energy Dashboard
 

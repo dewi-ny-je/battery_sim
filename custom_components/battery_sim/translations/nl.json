@@ -22,7 +22,9 @@
           "max_discharge_rate_kw": "Maximum ontlaadcapaciteit in kW",
           "max_charge_rate_kw": "Maximum laadcapaciteit in kW",
           "discharge_efficiency": "Ontlaadefficiëntie (0 tot 1)",
-          "charge_efficiency": "Laadefficiëntie (0 tot 1)"
+          "charge_efficiency": "Laadefficiëntie (0 tot 1)",
+          "rated_battery_cycles": "Levensduur van de accu in laad- en ontlaadcycli",
+          "end_of_life_degradation": "Capaciteit aan het einde van de levensduur (0 t/m 1)"
         },
         "description": "Stel de batterijspecificaties in."
       },
@@ -65,6 +67,20 @@
         "charge_state": {
           "name": "Laadstatus",
           "description": "Laadwaarde in kWh"
+        }
+      }
+    },
+    "set_battery_cycles": {
+      "name": "Batterijcycli instellen",
+      "description": "Stelt de gesimuleerde batterijcycli in voor een specifiek batterijapparaat",
+      "fields": {
+        "device_id": {
+          "name": "Doelbatterijapparaat",
+          "description": "Apparaat waarvoor de batterijcycli moeten worden ingesteld"
+        },
+        "battery_cycles": {
+          "name": "Batterijcycli",
+          "description": "Aantal cycli om toe te passen"
         }
       }
     }

@@ -30,6 +30,7 @@ from .const import (
     ATTR_MONEY_SAVED_EXPORT,
     ATTR_MONEY_SAVED_IMPORT,
     ATTR_MONEY_SAVED,
+    BATTERY_DEGRADATION,
     BATTERY_CYCLES,
     BATTERY_MODE,
     BATTERY_PLATFORMS,
@@ -42,6 +43,7 @@ from .const import (
     CONF_BATTERY_MAX_DISCHARGE_RATE,
     CONF_BATTERY_SIZE,
     CONF_BATTERY,
+    CONF_END_OF_LIFE_DEGRADATION,
     CONF_ENERGY_EXPORT_TARIFF,
     CONF_ENERGY_IMPORT_TARIFF,
     CONF_ENERGY_TARIFF,
@@ -49,6 +51,7 @@ from .const import (
     CONF_IMPORT_SENSOR,
     CONF_UPDATE_FREQUENCY,
     CONF_INPUT_LIST,
+    CONF_RATED_BATTERY_CYCLES,
     DISCHARGE_ONLY,
     DISCHARGING_RATE,
     DOMAIN,
@@ -91,6 +94,12 @@ BATTERY_CONFIG_SCHEMA = vol.Schema(
             vol.Optional(CONF_BATTERY_DISCHARGE_EFFICIENCY): vol.All(float),
             vol.Optional(CONF_BATTERY_CHARGE_EFFICIENCY): vol.All(float),
             vol.Optional(CONF_BATTERY_EFFICIENCY, default=1.0): vol.All(float),
+            vol.Optional(CONF_RATED_BATTERY_CYCLES, default=6000): vol.All(
+                vol.Coerce(float), vol.Range(min=1)
+            ),
+            vol.Optional(CONF_END_OF_LIFE_DEGRADATION, default=0.8): vol.All(
+                vol.Coerce(float), vol.Range(min=0, max=1)
+            ),
             vol.Optional(CONF_UPDATE_FREQUENCY, default=60): vol.All(
                 vol.Coerce(int), vol.Range(min=1)
             ),
@@ -164,6 +173,25 @@ async def async_setup_entry(hass, entry) -> bool:
         else:
             _LOGGER.error("No handle matched for device_id: %s", device_id)
 
+    async def handle_set_cycles(call):
+        device_id = call.data.get("device_id")
+        cycles = call.data.get("battery_cycles")
+        _LOGGER.debug("Calling set_battery_cycles with: %s", cycles)
+
+        dev_reg = dr.async_get(hass)
+        device = dev_reg.async_get(device_id)
+        if not device:
+            _LOGGER.error("Device not found: %s", device_id)
+            return
+
+        for handle_entry in hass.data[DOMAIN].values():
+            if (DOMAIN, handle_entry._name) in device.identifiers:
+                handle_entry.async_set_battery_cycles(cycles)
+                _LOGGER.debug("Battery cycles updated for device %s", handle_entry._name)
+                break
+        else:
+            _LOGGER.error("No handle matched for device_id: %s", device_id)
+
     hass.services.async_register(
         DOMAIN,
         "set_battery_charge_state",
@@ -171,6 +199,16 @@ async def async_setup_entry(hass, entry) -> bool:
         schema=vol.Schema({
             vol.Required("device_id"): str,
             vol.Required("charge_state"): vol.All(vol.Coerce(float), vol.Range(min=0))
+        }),
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        "set_battery_cycles",
+        handle_set_cycles,
+        schema=vol.Schema({
+            vol.Required("device_id"): str,
+            vol.Required("battery_cycles"): vol.All(vol.Coerce(float), vol.Range(min=0))
         }),
     )
 
@@ -242,6 +280,8 @@ class SimulatedBatteryHandle:
         self._listeners = []
 
         self._battery_size = config[CONF_BATTERY_SIZE]
+        self._rated_battery_cycles = config.get(CONF_RATED_BATTERY_CYCLES, 6000.0)
+        self._end_of_life_degradation = config.get(CONF_END_OF_LIFE_DEGRADATION, 0.8)
         if self._charge_state > self._battery_size:
             self._charge_state = self._battery_size
         self._max_discharge_rate = config[CONF_BATTERY_MAX_DISCHARGE_RATE]
@@ -279,6 +319,7 @@ class SimulatedBatteryHandle:
             ATTR_MONEY_SAVED_IMPORT: 0.0,
             ATTR_MONEY_SAVED_EXPORT: 0.0,
             BATTERY_CYCLES: 0.0,
+            BATTERY_DEGRADATION: 1.0,
         }
         for input_details in self._inputs:
             self._sensors[input_details[SIMULATED_SENSOR]] = None
@@ -299,11 +340,24 @@ class SimulatedBatteryHandle:
 
         if state <= 0:
             self._charge_state = 0
-        elif state <= self._battery_size:
+        elif state <= self.current_max_capacity:
             self._charge_state = state
         else:
-            self._charge_state = self._battery_size
+            self._charge_state = self.current_max_capacity
             
+        dispatcher_send(self._hass, f"{self._name}-{MESSAGE_TYPE_BATTERY_UPDATE}")
+        return
+
+    def async_set_battery_cycles(self, cycles: float):
+        """Set battery cycles to simulate ageing on demand."""
+        self._sensors[BATTERY_CYCLES] = max(float(cycles), 0.0)
+        self._sensors[ATTR_ENERGY_BATTERY_IN] = self._sensors[BATTERY_CYCLES] * float(
+            self._battery_size
+        )
+        self._sensors[BATTERY_DEGRADATION] = self.degradation_factor
+        self._charge_state = min(float(self._charge_state), self.current_max_capacity)
+        self._charge_percentage = round(100 * self._charge_state / self.current_max_capacity)
+
         dispatcher_send(self._hass, f"{self._name}-{MESSAGE_TYPE_BATTERY_UPDATE}")
         return
         
@@ -503,6 +557,18 @@ class SimulatedBatteryHandle:
         self._accumulated_export_reading = 0.0
         self._accumulated_import_reading = 0.0
 
+    @property
+    def degradation_factor(self) -> float:
+        """Return current degradation factor based on charge/discharge cycles."""
+        cycles = float(self._sensors.get(BATTERY_CYCLES, 0.0))
+        capped_progress = min(max(cycles / float(self._rated_battery_cycles), 0.0), 1.0)
+        return 1.0 - ((1.0 - float(self._end_of_life_degradation)) * capped_progress)
+
+    @property
+    def current_max_capacity(self) -> float:
+        """Return current degraded maximum battery capacity in kWh."""
+        return max(float(self._battery_size) * self.degradation_factor, 0.000001)
+
     def update_battery(self, import_amount, export_amount):
         """Update battery statistics based on the reading for Im- or Export."""
         amount_to_charge: float = 0.0
@@ -541,8 +607,18 @@ class SimulatedBatteryHandle:
         charge_limit = time_since_last_battery_update * (self._charge_limit / 3600)
         discharge_limit = time_since_last_battery_update * (self._discharge_limit / 3600)
 
-        available_capacity_to_charge = max((float(self._battery_size) * float(self._maximum_soc) / 100) - float(self._charge_state), 0)
-        available_capacity_to_discharge = max((float(self._charge_state) - (float(self._battery_size) * float(self._minimum_soc) / 100)), 0) * float(self._battery_discharge_efficiency)
+        effective_max_capacity = self.current_max_capacity
+        max_charge_soc_capacity = effective_max_capacity * float(self._maximum_soc) / 100
+        min_discharge_soc_capacity = (
+            effective_max_capacity * float(self._minimum_soc) / 100
+        )
+
+        available_capacity_to_charge = max(
+            max_charge_soc_capacity - float(self._charge_state), 0
+        )
+        available_capacity_to_discharge = max(
+            float(self._charge_state) - min_discharge_soc_capacity, 0
+        ) * float(self._battery_discharge_efficiency)
         
         if self._switches[PAUSE_BATTERY]:
             _LOGGER.debug("(%s) Battery paused.", self._name)
@@ -664,8 +740,11 @@ class SimulatedBatteryHandle:
         self._sensors[BATTERY_CYCLES] = (
             self._sensors[ATTR_ENERGY_BATTERY_IN] / self._battery_size
         )
+        self._sensors[BATTERY_DEGRADATION] = self.degradation_factor
 
-        self._charge_percentage = round(100 * self._charge_state / self._battery_size)
+        self._charge_state = min(float(self._charge_state), effective_max_capacity)
+
+        self._charge_percentage = round(100 * self._charge_state / effective_max_capacity)
 
         # Keep "mode" (how the battery operates) separate from capacity "status".
         if self._charge_percentage < 2:

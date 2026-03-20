@@ -18,8 +18,10 @@ from .const import (
     CONF_BATTERY_CHARGE_EFFICIENCY,
     CONF_BATTERY_DISCHARGE_EFFICIENCY,
     CONF_BATTERY_EFFICIENCY,
+    CONF_END_OF_LIFE_DEGRADATION,
     CONF_UPDATE_FREQUENCY,
     CONF_INPUT_LIST,
+    CONF_RATED_BATTERY_CYCLES,
     CONF_UNIQUE_NAME,
     SETUP_TYPE,
     CONFIG_FLOW,
@@ -57,6 +59,8 @@ class BatterySetupConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._data = BATTERY_OPTIONS[user_input[BATTERY_TYPE]]
             self._data[SETUP_TYPE] = CONFIG_FLOW
             self._data[CONF_NAME] = f"{user_input[BATTERY_TYPE]}"
+            self._data[CONF_RATED_BATTERY_CYCLES] = 6000
+            self._data[CONF_END_OF_LIFE_DEGRADATION] = 0.8
             self._data[CONF_UPDATE_FREQUENCY] = 60
             await self.async_set_unique_id(self._data[CONF_NAME])
             self._abort_if_unique_id_configured()
@@ -99,6 +103,12 @@ class BatterySetupConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         vol.Coerce(float), vol.Range(min=0, max=1)
                     ),
                     vol.Required(CONF_BATTERY_CHARGE_EFFICIENCY, default=0.9): vol.All(
+                        vol.Coerce(float), vol.Range(min=0, max=1)
+                    ),
+                    vol.Required(CONF_RATED_BATTERY_CYCLES, default=6000): vol.All(
+                        vol.Coerce(float), vol.Range(min=1)
+                    ),
+                    vol.Required(CONF_END_OF_LIFE_DEGRADATION, default=0.8): vol.All(
                         vol.Coerce(float), vol.Range(min=0, max=1)
                     ),
                     vol.Required(CONF_UPDATE_FREQUENCY, default=60): vol.All(
@@ -241,6 +251,12 @@ class BatteryOptionsFlowHandler(config_entries.OptionsFlow):
             self.updated_entry[CONF_BATTERY_CHARGE_EFFICIENCY] = user_input[
                 CONF_BATTERY_CHARGE_EFFICIENCY
             ]
+            self.updated_entry[CONF_RATED_BATTERY_CYCLES] = user_input[
+                CONF_RATED_BATTERY_CYCLES
+            ]
+            self.updated_entry[CONF_END_OF_LIFE_DEGRADATION] = user_input[
+                CONF_END_OF_LIFE_DEGRADATION
+            ]
             self.updated_entry.pop(CONF_BATTERY_EFFICIENCY, None)
             self.updated_entry[CONF_UPDATE_FREQUENCY] = user_input[
                 CONF_UPDATE_FREQUENCY
@@ -278,6 +294,14 @@ class BatteryOptionsFlowHandler(config_entries.OptionsFlow):
                     CONF_BATTERY_CHARGE_EFFICIENCY,
                     1.0,
                 ),
+            ): vol.All(vol.Coerce(float), vol.Range(min=0, max=1)),
+            vol.Required(
+                CONF_RATED_BATTERY_CYCLES,
+                default=self.updated_entry.get(CONF_RATED_BATTERY_CYCLES, 6000),
+            ): vol.All(vol.Coerce(float), vol.Range(min=1)),
+            vol.Required(
+                CONF_END_OF_LIFE_DEGRADATION,
+                default=self.updated_entry.get(CONF_END_OF_LIFE_DEGRADATION, 0.8),
             ): vol.All(vol.Coerce(float), vol.Range(min=0, max=1)),
             vol.Required(
                 CONF_UPDATE_FREQUENCY,

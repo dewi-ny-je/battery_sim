@@ -23,7 +23,9 @@
           "max_discharge_rate_kw": "Maximum discharge rate in kW",
           "max_charge_rate_kw": "Maximum charging rate in kW",
           "discharge_efficiency": "Discharge efficiency (0 to 1)",
-          "charge_efficiency": "Charge efficiency (0 to 1)"
+          "charge_efficiency": "Charge efficiency (0 to 1)",
+          "rated_battery_cycles": "Rated battery cycles",
+          "end_of_life_degradation": "Capacity at end of life (0 to 1)"
         },
         "description": "Set the specifications of the battery. Please consider posting details of the battery you are simulating on our github so we can add it to the template list."
       },
@@ -94,7 +96,9 @@
           "max_discharge_rate_kw": "Maximum discharge rate in kW",
           "max_charge_rate_kw": "Maximum charging rate in kW",
           "discharge_efficiency": "Discharge efficiency (0 to 1)",
-          "charge_efficiency": "Charge efficiency (0 to 1)"
+          "charge_efficiency": "Charge efficiency (0 to 1)",
+          "rated_battery_cycles": "Rated battery cycles",
+          "end_of_life_degradation": "Capacity at end of life (0 to 1)"
         }
       },
       "input_sensors": {
@@ -168,6 +172,20 @@
         "charge_state": {
           "name": "Charge State",
           "description": "Value of charge in kWh"
+        }
+      }
+    },
+    "set_battery_cycles": {
+      "name": "Set Battery Cycles",
+      "description": "Set the simulated battery cycles for a specific battery device",
+      "fields": {
+        "device_id": {
+          "name": "Target Battery Device",
+          "description": "Device to set battery cycles for"
+        },
+        "battery_cycles": {
+          "name": "Battery Cycles",
+          "description": "Cycle count to apply"
         }
       }
     }
