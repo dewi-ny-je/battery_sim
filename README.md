@@ -20,9 +20,9 @@ The relevant parameters are:
 - size_kwh: the maximum usable capacity of the battery in kwh - must be floating point number (with a decimal point e.g. 5.0)
 - max_discharge_rate_kw: how fast the battery can discharge in kw - must be floating point number (with a decimal point e.g. 5.0)
 - max_charge_rate_kw: how fast the battery can charge in kw - must be floating point number (with a decimal point e.g. 5.0)
-- discharge_efficiency and charge_efficiency - the two efficiencies of the battery (0-1). This factor is applied at charge and discharge of the battery. See below.
+- discharge_efficiency and charge_efficiency - the two efficiencies of the battery. You can enter either a single value between 0 and 1, or a power curve such as `0:0.90, 2.5:0.94, 5:0.95`. The integration linearly interpolates between the points using the average charging/discharging power during each update interval. See below.
 - energy_tariff - (optional) the sensor that tracks the energy tarriff - units not supported at present.
-- update_frequency - the maximum interval between updates. Default (and recommended) to 60 seconds. Faster updates don't improve accuracy.
+- update_frequency - the maximum interval between updates. Default (and recommended) to 60 seconds. Faster updates don't improve accuracy. Battery calculations are also rate-limited to a minimum interval of 5 seconds to avoid oscillations when settings or modes are changed repeatedly.
 
 ```yaml
 battery_sim:
@@ -33,8 +33,8 @@ battery_sim:
     size_kwh: 13.5
     max_discharge_rate_kw: 5.0
     max_charge_rate_kw: 3.68
-    discharge_efficiency: 0.95
-    charge_efficiency: 0.95
+    discharge_efficiency: 0:0.92, 2.5:0.95, 5:0.95
+    charge_efficiency: 0:0.90, 2:0.94, 3.68:0.95
     energy_tariff: 0.184
   lg_chem_resu10h:
     name: LG Chem
@@ -69,6 +69,17 @@ battery_sim:
 
 This integration allows separate charge and discharge efficiencies because they are dependent on the dis-/charge speed and low speeds
 lower the effective values. If you usually discharge the battery below 500 W, consider lowering the discharge efficiency below manufacturer data.
+
+You can configure each efficiency either as:
+
+- a single value, for example `0.95`
+- or a power curve, for example `0:0.88, 0.5:0.90, 2.5:0.94, 5:0.95`
+
+The power values are in kW. During each battery update, the integration computes the average charging or discharging power as:
+
+`energy transferred during the interval / interval duration`
+
+It then linearly interpolates the efficiency from the configured points and uses that value for the update. Two extra sensors report the charge and discharge efficiency used for the most recent update.
 
 The predefined settings provided refer to the datasheets, so consider them as optimistic: there are reports of batteries rated at 93.5% 
 discharge efficiency for 800-2500 W which at very low power levels (100-150 W) can achieve only 80%.
