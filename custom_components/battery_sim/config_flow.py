@@ -59,7 +59,7 @@ class BatterySetupConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @callback
     def async_get_options_flow(config_entry):
         """Return flow options."""
-        return BatteryOptionsFlowHandler()
+        return BatteryOptionsFlowHandler(config_entry)
 
     async def async_step_user(self, user_input):
         """Handle a flow initialized by the user."""
@@ -232,12 +232,22 @@ class BatterySetupConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 class BatteryOptionsFlowHandler(config_entries.OptionsFlow):
     """Handle a option flow for battery."""
 
-    def __init__(self):
+    def __init__(self, config_entry=None):
         """Initialize options flow."""
+        self._config_entry_compat = config_entry
+        self.updated_entry = None
+        self.current_input_entry = None
+
+    @property
+    def _battery_config_entry(self):
+        """Return the config entry for both old and new Home Assistant cores."""
+        return getattr(self, "config_entry", None) or self._config_entry_compat
 
     async def async_step_init(self, user_input=None):
         """Handle options flow."""
-        self.updated_entry = self.config_entry.data.copy()
+        config_entry = self._battery_config_entry
+        self.updated_entry = config_entry.data.copy()
+        self._active_config_entry = config_entry
         if CONF_INPUT_LIST not in self.updated_entry:
             self.updated_entry[CONF_INPUT_LIST] = generate_input_list(
                 config=self.updated_entry
@@ -273,9 +283,9 @@ class BatteryOptionsFlowHandler(config_entries.OptionsFlow):
                 CONF_UPDATE_FREQUENCY
             ]
             self.hass.config_entries.async_update_entry(
-                self.config_entry,
+                self._active_config_entry,
                 data=self.updated_entry,
-                options=self.config_entry.options,
+                options=self._active_config_entry.options,
             )
             return await self.async_step_init()
 
@@ -346,9 +356,9 @@ class BatteryOptionsFlowHandler(config_entries.OptionsFlow):
                 if input[SENSOR_ID] == user_input[CONF_INPUT_LIST]:
                     self.updated_entry[CONF_INPUT_LIST].remove(input)
             self.hass.config_entries.async_update_entry(
-                self.config_entry,
+                self._active_config_entry,
                 data=self.updated_entry,
-                options=self.config_entry.options,
+                options=self._active_config_entry.options,
             )
             return await self.async_step_init()
 
@@ -432,9 +442,9 @@ class BatteryOptionsFlowHandler(config_entries.OptionsFlow):
     async def async_step_no_tariff_info(self, user_input=None):
         self.current_input_entry[TARIFF_TYPE] = NO_TARIFF_INFO
         self.hass.config_entries.async_update_entry(
-            self.config_entry,
+            self._active_config_entry,
             data=self.updated_entry,
-            options=self.config_entry.options,
+            options=self._active_config_entry.options,
         )
         return await self.async_step_init()
 
@@ -443,9 +453,9 @@ class BatteryOptionsFlowHandler(config_entries.OptionsFlow):
             self.current_input_entry[TARIFF_TYPE] = FIXED_TARIFF
             self.current_input_entry[FIXED_TARIFF] = user_input[FIXED_TARIFF]
             self.hass.config_entries.async_update_entry(
-                self.config_entry,
+                self._active_config_entry,
                 data=self.updated_entry,
-                options=self.config_entry.options,
+                options=self._active_config_entry.options,
             )
             return await self.async_step_init()
 
@@ -468,9 +478,9 @@ class BatteryOptionsFlowHandler(config_entries.OptionsFlow):
             self.current_input_entry[TARIFF_TYPE] = TARIFF_SENSOR
             self.current_input_entry[TARIFF_SENSOR] = user_input[TARIFF_SENSOR]
             self.hass.config_entries.async_update_entry(
-                self.config_entry,
+                self._active_config_entry,
                 data=self.updated_entry,
-                options=self.config_entry.options,
+                options=self._active_config_entry.options,
             )
             return await self.async_step_init()
 

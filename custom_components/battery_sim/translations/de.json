@@ -25,7 +25,8 @@
           "discharge_efficiency": "Entladewirkungsgrad oder Kurve (z. B. 0.95 oder 0:0.9, 5:0.95)",
           "charge_efficiency": "Ladewirkungsgrad oder Kurve (z. B. 0.95 oder 0:0.9, 5:0.95)",
           "rated_battery_cycles": "Nennzyklen der Batterie",
-          "end_of_life_degradation": "Kapazität am Ende der Lebensdauer (0 bis 1)"
+          "end_of_life_degradation": "Kapazität am Ende der Lebensdauer (0 bis 1)",
+          "update_frequency": "Aktualisierungsintervall in Sekunden"
         },
         "description": "Lege die Spezifikationen der Batterie fest. Bitte erwäge, Details der von dir simulierten Batterie auf unserem GitHub zu veröffentlichen, damit wir sie zur Vorlagenliste hinzufügen können."
       },
@@ -98,7 +99,8 @@
           "discharge_efficiency": "Entladewirkungsgrad oder Kurve (z. B. 0.95 oder 0:0.9, 5:0.95)",
           "charge_efficiency": "Ladewirkungsgrad oder Kurve (z. B. 0.95 oder 0:0.9, 5:0.95)",
           "rated_battery_cycles": "Nennzyklen der Batterie",
-          "end_of_life_degradation": "Kapazität am Ende der Lebensdauer (0 bis 1)"
+          "end_of_life_degradation": "Kapazität am Ende der Lebensdauer (0 bis 1)",
+          "update_frequency": "Aktualisierungsintervall in Sekunden"
         }
       },
       "input_sensors": {

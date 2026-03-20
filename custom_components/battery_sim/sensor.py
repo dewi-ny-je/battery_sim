@@ -195,6 +195,11 @@ class DisplayOnlySensor(RestoreEntity, SensorEntity):
         self._last_reset = dt_util.utcnow()
         self._available = False
 
+    @property
+    def _supports_last_reset(self):
+        """Return True when Home Assistant allows last_reset for this sensor."""
+        return self.state_class == SensorStateClass.TOTAL
+
     async def async_added_to_hass(self):
         """Subscribe for update from the battery."""
         await super().async_added_to_hass()
@@ -204,9 +209,11 @@ class DisplayOnlySensor(RestoreEntity, SensorEntity):
         if state:
             try:
                 self._handle._sensors[self._sensor_type] = float(state.state)
-                self._last_reset = dt_util.as_utc(
-                    dt_util.parse_datetime(state.attributes.get(ATTR_LAST_RESET))
-                )
+                last_reset = state.attributes.get(ATTR_LAST_RESET)
+                if self._supports_last_reset and last_reset is not None:
+                    parsed_last_reset = dt_util.parse_datetime(last_reset)
+                    if parsed_last_reset is not None:
+                        self._last_reset = dt_util.as_utc(parsed_last_reset)
                 self._available = True
                 await self.async_update_ha_state(True)
             except Exception:
@@ -328,6 +335,8 @@ class DisplayOnlySensor(RestoreEntity, SensorEntity):
     @property
     def last_reset(self):
         """Return the time when the sensor was last reset."""
+        if not self._supports_last_reset:
+            return None
         return self._last_reset
 
     @property
