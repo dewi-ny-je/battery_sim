@@ -21,8 +21,8 @@
           "size_kwh": "Batteristorlek i kWh",
           "max_discharge_rate_kw": "Max urladdningshastighet i kW",
           "max_charge_rate_kw": "Max laddningshastighet i kW",
-          "discharge_efficiency": "Urladdningseffektivitet (0 till 1)",
-          "charge_efficiency": "Laddningseffektivitet (0 till 1)",
+          "discharge_efficiency": "Urladdningseffektivitet eller kurva (t.ex. 0.95 eller 0:0.9, 5:0.95)",
+          "charge_efficiency": "Laddningseffektivitet eller kurva (t.ex. 0.95 eller 0:0.9, 5:0.95)",
           "rated_battery_cycles": "Nominella battericykler",
           "end_of_life_degradation": "Kapacitet vid slutet av livslängden (0 till 1)"
         },

@@ -22,12 +22,12 @@
           "size_kwh": "Battery size in kWh",
           "max_discharge_rate_kw": "Maximum discharge rate in kW",
           "max_charge_rate_kw": "Maximum charging rate in kW",
-          "discharge_efficiency": "Discharge efficiency (0 to 1)",
-          "charge_efficiency": "Charge efficiency (0 to 1)",
+          "discharge_efficiency": "Discharge efficiency or curve (e.g. 0.95 or 0:0.9, 5:0.95)",
+          "charge_efficiency": "Charge efficiency or curve (e.g. 0.95 or 0:0.9, 5:0.95)",
           "rated_battery_cycles": "Rated battery cycles",
           "end_of_life_degradation": "Capacity at end of life (0 to 1)"
         },
-        "description": "Set the specifications of the battery. Please consider posting details of the battery you are simulating on our github so we can add it to the template list."
+        "description": "Set the specifications of the battery. Efficiencies can be entered as a single value or as power/efficiency pairs such as 0:0.9, 5:0.95. Please consider posting details of the battery you are simulating on our github so we can add it to the template list."
       },
       "meter_menu": {
         "title": "Add Meters",
@@ -95,8 +95,8 @@
           "size_kwh": "Battery size in kWh",
           "max_discharge_rate_kw": "Maximum discharge rate in kW",
           "max_charge_rate_kw": "Maximum charging rate in kW",
-          "discharge_efficiency": "Discharge efficiency (0 to 1)",
-          "charge_efficiency": "Charge efficiency (0 to 1)",
+          "discharge_efficiency": "Discharge efficiency or curve (e.g. 0.95 or 0:0.9, 5:0.95)",
+          "charge_efficiency": "Charge efficiency or curve (e.g. 0.95 or 0:0.9, 5:0.95)",
           "rated_battery_cycles": "Rated battery cycles",
           "end_of_life_degradation": "Capacity at end of life (0 to 1)"
         }
