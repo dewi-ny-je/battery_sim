@@ -11,7 +11,7 @@ _LOGGER = logging.getLogger(__name__)
 BATTERY_BUTTONS = [
     {
         "name": RESET_BATTERY,
-        "key": "overide_charging_enabled",
+        "key": "override_charging_enabled",
         "icon": "mdi:fast-forward",
     }
 ]
