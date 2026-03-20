@@ -8,21 +8,33 @@ Please note this is a simulation and a real battery may behave differently and n
 
 ## Setup
 
-The easiest way to get battery_sim is to use HACS to add it as an integration. If you don't want to use HACS you can just copy the code into the custom_components folder in your home assistant config folder. 
+The easiest way to get battery_sim is to use HACS to add it as an integration. If you do not want to use HACS, copy this repository into the `custom_components` folder in your Home Assistant configuration directory.
 
-Once you have done this you need to create your batteries. You can create any custom battery you want or use batteries with parameters the same as some common available models. The recommended way to do this is by going to **Settings > Devices and Services** and then clicking **Add Integration** and search for **Battery Simulation** and then work through the dialogue to create your battery. Repeat this process for each battery you want to add. 
+After installation, create one or more batteries. The recommended approach is to go to **Settings > Devices & Services**, click **Add Integration**, search for **Battery Simulation**, and work through the dialog for each battery you want to simulate.
 
-Alternatively you can add your battery to the home assistant configuration file.
+You can also define batteries in `configuration.yaml`. Each battery is created under `battery_sim:` using a unique slug key. All YAML parameters currently supported by the integration are listed below.
 
-The relevant parameters are:
-- import_sensor: the sensor that measures the energy in kwh imported (coming into) your house cummlatively (e.g. output of a utility_meter component)
-- export_sensor: the sensor that measures the energy in kwh exported (leaving - sometimes called injection) your house cummlatively (e.g. output of a utility_meter component)
-- size_kwh: the maximum usable capacity of the battery in kwh - must be floating point number (with a decimal point e.g. 5.0)
-- max_discharge_rate_kw: how fast the battery can discharge in kw - must be floating point number (with a decimal point e.g. 5.0)
-- max_charge_rate_kw: how fast the battery can charge in kw - must be floating point number (with a decimal point e.g. 5.0)
-- discharge_efficiency and charge_efficiency - the two efficiencies of the battery. You can enter either a single value between 0 and 1, or a power curve such as `0:0.90, 2.5:0.94, 5:0.95`. The integration linearly interpolates between the points using the average charging/discharging power during each update interval. See below.
-- energy_tariff - (optional) the sensor that tracks the energy tarriff - units not supported at present.
-- update_frequency - the maximum interval between updates. Default (and recommended) to 60 seconds. Faster updates don't improve accuracy. Battery calculations are also rate-limited to a minimum interval of 5 seconds to avoid oscillations when settings or modes are changed repeatedly.
+### YAML parameters
+
+| Parameter | Required | Description |
+| --- | --- | --- |
+| `import_sensor` | Yes | Entity ID of the cumulative energy-import sensor in kWh, for example the output of a `utility_meter`. |
+| `export_sensor` | Yes | Entity ID of the cumulative energy-export sensor in kWh. |
+| `size_kwh` | Yes | Usable battery capacity in kWh. Use a floating-point value such as `13.5`. |
+| `max_discharge_rate_kw` | Yes | Maximum discharge power in kW. Use a floating-point value such as `5.0`. |
+| `max_charge_rate_kw` | No | Maximum charge power in kW. Defaults to `1.0` if omitted. |
+| `discharge_efficiency` | No | Battery discharge efficiency from `0` to `1`. If omitted, the integration falls back to `efficiency` when that legacy key is present, otherwise `1.0`. |
+| `charge_efficiency` | No | Battery charge efficiency from `0` to `1`. Defaults to `1.0` if omitted. |
+| `efficiency` | No | Legacy single-value efficiency key kept for backward compatibility. It is used as the default for `discharge_efficiency` when the newer split efficiency keys are not set. |
+| `energy_tariff` | No | Entity ID of a tariff sensor. For backward-compatible YAML setups this populates the import tariff input. |
+| `energy_import_tariff` | No | Entity ID of an import tariff sensor. |
+| `energy_export_tariff` | No | Entity ID of an export tariff sensor. |
+| `name` | No | Friendly name shown in Home Assistant. If omitted, the YAML object key is used. |
+| `rated_battery_cycles` | No | Number of full cycles at which end-of-life degradation is reached. Defaults to `6000`. |
+| `end_of_life_degradation` | No | Remaining usable capacity at `rated_battery_cycles`, expressed from `0` to `1`. Defaults to `0.8`. |
+| `update_frequency` | No | Maximum interval between updates in seconds. Defaults to `60`, which is also the recommended value. Faster updates do not improve accuracy. |
+
+### Example YAML
 
 ```yaml
 battery_sim:
@@ -33,9 +45,12 @@ battery_sim:
     size_kwh: 13.5
     max_discharge_rate_kw: 5.0
     max_charge_rate_kw: 3.68
-    discharge_efficiency: 0:0.92, 2.5:0.95, 5:0.95
-    charge_efficiency: 0:0.90, 2:0.94, 3.68:0.95
-    energy_tariff: 0.184
+    discharge_efficiency: 0.95
+    charge_efficiency: 0.95
+    rated_battery_cycles: 6000
+    end_of_life_degradation: 0.8
+    update_frequency: 60
+    energy_tariff: sensor.energy_tariff
   lg_chem_resu10h:
     name: LG Chem
     import_sensor: sensor.circuitsetup_cumulative_import_energy_kwh
@@ -43,51 +58,31 @@ battery_sim:
     size_kwh: 9.3
     max_discharge_rate_kw: 5.0
     max_charge_rate_kw: 3.3
-    discharge_efficiency: 0.795
+    discharge_efficiency: 0.975
     charge_efficiency: 0.975
-  sonnen_eco:
-    name: Sonnen Eco
-    import_sensor: sensor.circuitsetup_cumulative_import_energy_kwh
-    export_sensor: sensor.circuitsetup_cumulative_export_energy_kwh
-    size_kwh: 5.0
-    max_discharge_rate_kw: 2.5
-    max_charge_rate_kw: 2.5
-    discharge_efficiency: 0.95
-    charge_efficiency: 0.95
-  pika_harbour:
-    name: Pika Harbour
-    import_sensor: sensor.circuitsetup_cumulative_import_energy_kwh
-    export_sensor: sensor.circuitsetup_cumulative_export_energy_kwh
-    size_kwh: 8.6
-    max_discharge_rate_kw: 4.2
-    max_charge_rate_kw: 4.2
-    discharge_efficiency: 0.985
-    charge_efficiency: 0.985
-   ```
+    energy_import_tariff: sensor.grid_import_tariff
+    energy_export_tariff: sensor.grid_export_tariff
+```
 
 ## Battery Efficiencies
 
-This integration allows separate charge and discharge efficiencies because they are dependent on the dis-/charge speed and low speeds
-lower the effective values. If you usually discharge the battery below 500 W, consider lowering the discharge efficiency below manufacturer data.
+This integration supports separate `charge_efficiency` and `discharge_efficiency` values because battery efficiency is not flat across the full operating range. In practice, manufacturers often publish an efficiency curve: efficiency changes with charge or discharge power, and lower power levels typically produce worse results than the headline datasheet number.
 
-You can configure each efficiency either as:
+A simplified efficiency curve usually looks something like this:
 
-- a single value, for example `0.95`
-- or a power curve, for example `0:0.88, 0.5:0.90, 2.5:0.94, 5:0.95`
+| Charge/discharge power | Typical behavior |
+| --- | --- |
+| Very low power | Efficiency drops because fixed inverter and standby losses dominate. |
+| Medium power | Efficiency is usually at or near the best point on the curve. |
+| Very high power | Efficiency can taper off again because of conversion and thermal losses. |
 
-The power values are in kW. During each battery update, the integration computes the average charging or discharging power as:
+If your battery usually operates well below its rated power, choose more conservative efficiency values than the best-case number in the datasheet. For example, a battery advertised at roughly `93.5%` discharge efficiency in the `800-2500 W` range may perform closer to `80%` at only `100-150 W`.
 
-`energy transferred during the interval / interval duration`
+Because battery_sim uses fixed efficiencies rather than a dynamic per-watt curve, the best approach is to choose values that represent your most common operating range. If most of your simulated battery activity happens at low power, set lower `charge_efficiency` and `discharge_efficiency` values to approximate that part of the curve.
 
-It then linearly interpolates the efficiency from the configured points and uses that value for the update. Two extra sensors report the charge and discharge efficiency used for the most recent update.
+When reading a datasheet, make sure the quoted efficiency covers the whole path you care about. Some manufacturers quote inverter efficiency only, which may describe battery-to-AC conversion while excluding charging losses into the battery. In those cases, use conservative values for both charge and discharge.
 
-The predefined settings provided refer to the datasheets, so consider them as optimistic: there are reports of batteries rated at 93.5% 
-discharge efficiency for 800-2500 W which at very low power levels (100-150 W) can achieve only 80%.
-
-When reading a datasheet to decide which value you want to use be smart: sometimes a high efficiency is given but it refers only to the inverter
-(so, from charge in the battery to AC), omitting completely the charge efficiency (DC to battery, or AC to battery). Be conservative.
-
-## Battery degradation
+## Battery Degradation
 
 This integration models the degradation of the battery linearly, from 100% usable capacity (no degradation) at 0 cycles and (by default)
 80% usable capacity at 6000 cycles. The values can be provided in the settings.
