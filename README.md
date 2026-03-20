@@ -23,8 +23,8 @@ You can also define batteries in `configuration.yaml`. Each battery is created u
 | `size_kwh` | Yes | Usable battery capacity in kWh. Use a floating-point value such as `13.5`. |
 | `max_discharge_rate_kw` | Yes | Maximum discharge power in kW. Use a floating-point value such as `5.0`. |
 | `max_charge_rate_kw` | No | Maximum charge power in kW. Defaults to `1.0` if omitted. |
-| `discharge_efficiency` | No | Battery discharge efficiency from `0` to `1`. If omitted, the integration falls back to `efficiency` when that legacy key is present, otherwise `1.0`. |
-| `charge_efficiency` | No | Battery charge efficiency from `0` to `1`. Defaults to `1.0` if omitted. |
+| `discharge_efficiency` | No | Battery discharge efficiency from `0` to `1`. If omitted, the integration falls back to `efficiency` when that legacy key is present, otherwise `1.0`. You can enter either a single value between 0 and 1, or a power curve such as `0:0.90, 2.5:0.94, 5:0.95`. |
+| `charge_efficiency` | No | Battery charge efficiency from `0` to `1`. Defaults to `1.0` if omitted. You can enter either a single value between 0 and 1, or a power curve such as `0:0.90, 2.5:0.94, 5:0.95`. |
 | `efficiency` | No | Legacy single-value efficiency key kept for backward compatibility. It is used as the default for `discharge_efficiency` when the newer split efficiency keys are not set. |
 | `energy_tariff` | No | Entity ID of a tariff sensor. For backward-compatible YAML setups this populates the import tariff input. |
 | `energy_import_tariff` | No | Entity ID of an import tariff sensor. |
@@ -45,8 +45,8 @@ battery_sim:
     size_kwh: 13.5
     max_discharge_rate_kw: 5.0
     max_charge_rate_kw: 3.68
-    discharge_efficiency: 0.95
-    charge_efficiency: 0.95
+    discharge_efficiency: 0:0.92, 2.5:0.95, 5:0.95
+    charge_efficiency: 0:0.90, 2:0.94, 3.68:0.95
     rated_battery_cycles: 6000
     end_of_life_degradation: 0.8
     update_frequency: 60
@@ -68,6 +68,17 @@ battery_sim:
 
 This integration supports separate `charge_efficiency` and `discharge_efficiency` values because battery efficiency is not flat across the full operating range. In practice, manufacturers often publish an efficiency curve: efficiency changes with charge or discharge power, and lower power levels typically produce worse results than the headline datasheet number.
 
+You can configure each efficiency either as:
+
+- a single value, for example `0.95`
+- or a power curve, for example `0:0.88, 0.5:0.90, 2.5:0.94, 5:0.95`
+
+The power values are in kW. During each battery update, the integration computes the average charging or discharging power as:
+
+`energy transferred during the interval / interval duration`
+
+It then linearly interpolates the efficiency from the configured points and uses that value for the update. Two extra sensors report the charge and discharge efficiency used for the most recent update.
+
 A simplified efficiency curve usually looks something like this:
 
 | Charge/discharge power | Typical behavior |
@@ -76,9 +87,7 @@ A simplified efficiency curve usually looks something like this:
 | Medium power | Efficiency is usually at or near the best point on the curve. |
 | Very high power | Efficiency can taper off again because of conversion and thermal losses. |
 
-If your battery usually operates well below its rated power, choose more conservative efficiency values than the best-case number in the datasheet. For example, a battery advertised at roughly `93.5%` discharge efficiency in the `800-2500 W` range may perform closer to `80%` at only `100-150 W`.
-
-Because battery_sim uses fixed efficiencies rather than a dynamic per-watt curve, the best approach is to choose values that represent your most common operating range. If most of your simulated battery activity happens at low power, set lower `charge_efficiency` and `discharge_efficiency` values to approximate that part of the curve.
+If you use fixed efficiencies rather than an efficiency curve, the best approach is to choose values that represent your most common operating range. If most of your simulated battery activity happens at low power, set lower `charge_efficiency` and `discharge_efficiency` values to approximate that part of the curve and choose more conservative efficiency values than the best-case number in the datasheet.
 
 When reading a datasheet, make sure the quoted efficiency covers the whole path you care about. Some manufacturers quote inverter efficiency only, which may describe battery-to-AC conversion while excluding charging losses into the battery. In those cases, use conservative values for both charge and discharge.
 
