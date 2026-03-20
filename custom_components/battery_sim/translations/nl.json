@@ -21,8 +21,8 @@
           "size_kwh": "Batterij capaciteit in kWh",
           "max_discharge_rate_kw": "Maximum ontlaadcapaciteit in kW",
           "max_charge_rate_kw": "Maximum laadcapaciteit in kW",
-          "discharge_efficiency": "Ontlaadefficiëntie (0 tot 1)",
-          "charge_efficiency": "Laadefficiëntie (0 tot 1)",
+          "discharge_efficiency": "Ontlaadefficiëntie of curve (bijv. 0.95 of 0:0.9, 5:0.95)",
+          "charge_efficiency": "Laadefficiëntie of curve (bijv. 0.95 of 0:0.9, 5:0.95)",
           "rated_battery_cycles": "Levensduur van de accu in laad- en ontlaadcycli",
           "end_of_life_degradation": "Capaciteit aan het einde van de levensduur (0 t/m 1)"
         },

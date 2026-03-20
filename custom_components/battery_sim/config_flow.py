@@ -4,7 +4,13 @@ import voluptuous as vol
 import time
 
 from homeassistant import config_entries
-from homeassistant.helpers.selector import EntitySelector, EntitySelectorConfig
+from homeassistant.helpers.selector import (
+    EntitySelector,
+    EntitySelectorConfig,
+    TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
+)
 from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.const import CONF_NAME
 from homeassistant.core import callback
@@ -35,9 +41,19 @@ from .const import (
     FIXED_TARIFF,
     SIMULATED_SENSOR,
 )
-from .helpers import generate_input_list
+from .helpers import generate_input_list, validate_efficiency_config
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def efficiency_text_selector():
+    """Return a single-line text selector for efficiency curves."""
+    return TextSelector(
+        TextSelectorConfig(
+            type=TextSelectorType.TEXT,
+            multiline=False,
+        )
+    )
 
 
 @config_entries.HANDLERS.register(DOMAIN)
@@ -99,12 +115,12 @@ class BatterySetupConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Required(CONF_BATTERY_MAX_CHARGE_RATE): vol.All(
                         vol.Coerce(float)
                     ),
-                    vol.Required(CONF_BATTERY_DISCHARGE_EFFICIENCY, default=0.9): vol.All(
-                        vol.Coerce(float), vol.Range(min=0, max=1)
-                    ),
-                    vol.Required(CONF_BATTERY_CHARGE_EFFICIENCY, default=0.9): vol.All(
-                        vol.Coerce(float), vol.Range(min=0, max=1)
-                    ),
+                    vol.Required(
+                        CONF_BATTERY_DISCHARGE_EFFICIENCY, default="0.9"
+                    ): vol.All(efficiency_text_selector(), validate_efficiency_config),
+                    vol.Required(
+                        CONF_BATTERY_CHARGE_EFFICIENCY, default="0.9"
+                    ): vol.All(efficiency_text_selector(), validate_efficiency_config),
                     vol.Required(CONF_RATED_BATTERY_CYCLES, default=6000): vol.All(
                         vol.Coerce(float), vol.Range(min=1)
                     ),
@@ -283,18 +299,22 @@ class BatteryOptionsFlowHandler(config_entries.OptionsFlow):
             # Use .get() so existing entries using legacy `efficiency` keep working.
             vol.Required(
                 CONF_BATTERY_DISCHARGE_EFFICIENCY,
-                default=self.updated_entry.get(
-                    CONF_BATTERY_DISCHARGE_EFFICIENCY,
-                    self.updated_entry.get(CONF_BATTERY_EFFICIENCY, 0.9),
+                default=str(
+                    self.updated_entry.get(
+                        CONF_BATTERY_DISCHARGE_EFFICIENCY,
+                        self.updated_entry.get(CONF_BATTERY_EFFICIENCY, 0.9),
+                    )
                 ),
-            ): vol.All(vol.Coerce(float), vol.Range(min=0, max=1)),
+            ): vol.All(efficiency_text_selector(), validate_efficiency_config),
             vol.Required(
                 CONF_BATTERY_CHARGE_EFFICIENCY,
-                default=self.updated_entry.get(
-                    CONF_BATTERY_CHARGE_EFFICIENCY,
-                    1.0,
+                default=str(
+                    self.updated_entry.get(
+                        CONF_BATTERY_CHARGE_EFFICIENCY,
+                        self.updated_entry.get(CONF_BATTERY_EFFICIENCY, 1.0),
+                    )
                 ),
-            ): vol.All(vol.Coerce(float), vol.Range(min=0, max=1)),
+            ): vol.All(efficiency_text_selector(), validate_efficiency_config),
             vol.Required(
                 CONF_RATED_BATTERY_CYCLES,
                 default=self.updated_entry.get(CONF_RATED_BATTERY_CYCLES, 6000),
