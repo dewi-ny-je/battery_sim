@@ -756,8 +756,12 @@ class SimulatedBatteryHandle:
         discharge_efficiency = interpolate_efficiency(
             self._battery_discharge_efficiency_curve, requested_discharge_power
         )
-        self._sensors[ATTR_LAST_CHARGE_EFFICIENCY] = charge_efficiency
-        self._sensors[ATTR_LAST_DISCHARGE_EFFICIENCY] = discharge_efficiency
+        self._sensors[ATTR_LAST_CHARGE_EFFICIENCY] = (
+            charge_efficiency if amount_to_charge > 0 else float("nan")
+        )
+        self._sensors[ATTR_LAST_DISCHARGE_EFFICIENCY] = (
+            discharge_efficiency if amount_to_discharge > 0 else float("nan")
+        )
 
         if amount_to_charge > 0:
             amount_to_charge = min(
