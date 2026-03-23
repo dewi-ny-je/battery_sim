@@ -757,10 +757,10 @@ class SimulatedBatteryHandle:
             self._battery_discharge_efficiency_curve, requested_discharge_power
         )
         self._sensors[ATTR_LAST_CHARGE_EFFICIENCY] = (
-            charge_efficiency if amount_to_charge > 0 else float("nan")
+            charge_efficiency if amount_to_charge > 0 else None
         )
         self._sensors[ATTR_LAST_DISCHARGE_EFFICIENCY] = (
-            discharge_efficiency if amount_to_discharge > 0 else float("nan")
+            discharge_efficiency if amount_to_discharge > 0 else None
         )
 
         if amount_to_charge > 0:
