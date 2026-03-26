@@ -121,3 +121,7 @@ logger:
 ```
 
 to your configuration.yaml and then restarting. If you leave it to run for a few minutes go to logs then and click "load full log" you should see entries from the battery saying it's been set up and then each time it receives an update. If you need to raise an issue then including this code is helpful.
+
+## Acknowledgements
+
+Original idea and integration developed by hif2k1. Thanks for your work! 
