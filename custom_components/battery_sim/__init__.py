@@ -350,7 +350,7 @@ class SimulatedBatteryHandle:
             ATTR_LAST_DISCHARGE_EFFICIENCY: self._battery_discharge_efficiency_curve[0][1],
         }
         for input_details in self._inputs:
-            self._sensors[input_details[SIMULATED_SENSOR]] = None
+            self._sensors[input_details[SIMULATED_SENSOR]] = 0.0
 
         async_at_start(self._hass, self.async_source_tracking)
 
