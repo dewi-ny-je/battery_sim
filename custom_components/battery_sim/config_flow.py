@@ -382,7 +382,9 @@ class BatteryOptionsFlowHandler(config_entries.OptionsFlow):
             ): vol.All(vol.Coerce(int), vol.Range(min=1)),
             vol.Optional(
                 CONF_SOLAR_ENERGY_SENSOR,
-                default=self.updated_entry.get(CONF_SOLAR_ENERGY_SENSOR),
+                description={
+                    "suggested_value": self.updated_entry.get(CONF_SOLAR_ENERGY_SENSOR)
+                },
             ): EntitySelector(
                 EntitySelectorConfig(device_class=SensorDeviceClass.ENERGY)
             ),
