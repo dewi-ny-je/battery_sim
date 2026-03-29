@@ -159,10 +159,12 @@ def main() -> int:
         data, duplicates = load_json_and_duplicates(path)
         leaves = flatten_leaves(data)
         unused = sorted(".".join(p) for p in leaves - used)
+        missing = sorted(".".join(p) for p in used - leaves)
 
         print(f"{path.name}:")
         print(f"  duplicate keys: {len(duplicates)}")
         print(f"  unused leaf keys: {len(unused)}")
+        print(f"  missing used keys: {len(missing)}")
 
         if duplicates:
             any_problem = True
@@ -175,6 +177,12 @@ def main() -> int:
             print("  unused keys:")
             for u in unused:
                 print(f"    - {u}")
+
+        if missing:
+            any_problem = True
+            print("  missing keys:")
+            for m in missing:
+                print(f"    - {m}")
 
     return 1 if any_problem else 0
 
