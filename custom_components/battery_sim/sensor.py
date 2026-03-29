@@ -43,6 +43,7 @@ from .const import (
     ATTR_ENERGY_BATTERY_IN,
     CHARGING_RATE,
     DISCHARGING_RATE,
+    SOLAR_POWER_CAP,
     SENSOR_TYPE,
     EXPORT,
     SIMULATED_SENSOR,
@@ -124,6 +125,11 @@ async def define_sensors(hass, handle):
     sensors.append(
         DisplayOnlySensor(
             handle, DISCHARGING_RATE, SensorDeviceClass.POWER, UnitOfPower.KILO_WATT
+        )
+    )
+    sensors.append(
+        DisplayOnlySensor(
+            handle, SOLAR_POWER_CAP, SensorDeviceClass.POWER, UnitOfPower.KILO_WATT
         )
     )
     sensors.append(DisplayOnlySensor(handle, ATTR_LAST_CHARGE_EFFICIENCY, None, None))
@@ -266,6 +272,9 @@ class DisplayOnlySensor(RestoreEntity, SensorEntity):
     def state_class(self):
         """Return the device class of the sensor."""
         if self._sensor_type in [
+            CHARGING_RATE,
+            DISCHARGING_RATE,
+            SOLAR_POWER_CAP,
             ATTR_LAST_CHARGE_EFFICIENCY,
             ATTR_LAST_DISCHARGE_EFFICIENCY,
         ]:

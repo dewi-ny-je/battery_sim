@@ -25,7 +25,8 @@
           "charge_efficiency": "Laadefficiëntie of curve (bijv. 0.95 of 0:0.9, 5:0.95)",
           "rated_battery_cycles": "Levensduur van de accu in laad- en ontlaadcycli",
           "end_of_life_degradation": "Capaciteit aan het einde van de levensduur (0 t/m 1)",
-          "update_frequency": "Updatefrequentie in seconden"
+          "update_frequency": "Updatefrequentie in seconden",
+          "solar_energy_sensor": "Solarenergie sensor"
         },
         "description": "Stel de batterijspecificaties in."
       },

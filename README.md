@@ -29,6 +29,7 @@ You can also define batteries in `configuration.yaml`. Each battery is created u
 | `energy_tariff` | No | Entity ID of a tariff sensor. For backward-compatible YAML setups this populates the import tariff input. |
 | `energy_import_tariff` | No | Entity ID of an import tariff sensor. |
 | `energy_export_tariff` | No | Entity ID of an export tariff sensor. |
+| `solar_energy_sensor` | No | Entity ID of a cumulative solar energy production sensor in kWh. When configured, the maximum charge power is capped by the solar production rate during each update interval. Seldomly needed, see below. |
 | `name` | No | Friendly name shown in Home Assistant. If omitted, the YAML object key is used. |
 | `rated_battery_cycles` | No | Number of full cycles at which end-of-life degradation is reached. Defaults to `6000`. |
 | `end_of_life_degradation` | No | Remaining usable capacity at `rated_battery_cycles`, expressed from `0` to `1`. Defaults to `0.8`. |
@@ -63,6 +64,41 @@ battery_sim:
     energy_import_tariff: sensor.grid_import_tariff
     energy_export_tariff: sensor.grid_export_tariff
 ```
+
+## Sensors
+
+The integration creates the following sensors for each battery:
+
+| Sensor | Description | Unit |
+| --- | --- | --- |
+| `current charging rate` | Real-time charging power based on the energy transferred during the last update interval. | kW |
+| `current discharging rate` | Real-time discharging power based on the energy transferred during the last update interval. | kW |
+| `solar power cap` | Average power corresponding to the solar generation cap, updated each interval. Only available when a solar energy sensor is configured. | kW |
+| `battery_energy_in` | Cumulative energy charged into the battery since initialization or last reset. | kWh |
+| `battery_energy_out` | Cumulative energy discharged from the battery since initialization or last reset. | kWh |
+| `total energy saved` | Total energy saved compared to direct grid use. | kWh |
+| `total_money_saved` | Total money saved by the battery operation. | Currency |
+| `money_saved_on_imports` | Money saved by reducing energy imports from the grid. | Currency |
+| `extra_money_earned_on_exports` | Extra revenue earned by exporting energy to the grid. | Currency |
+| `last charge efficiency` | Charge efficiency used in the most recent update. | Ratio |
+| `last discharge efficiency` | Discharge efficiency used in the most recent update. | Ratio |
+| `battery_cycles` | Number of full charge/discharge cycles accumulated. | Cycles |
+| `battery_degradation` | Current degradation factor (1.0 = no degradation). | Ratio |
+| `Battery_mode_now` | Current operating mode (Charging, Discharging, Idle, etc.). | State |
+| `percentage` | Current charge level as a percentage. | % |
+| `status` | Status indicator showing if battery is Full, Empty, or Normal. | State |
+
+## Solar Power Cap : Important Remarks
+
+When a solar energy sensor is configured via the `solar_energy_sensor` parameter, the integration uses solar generation data to intelligently cap the maximum charging power during each update interval.
+
+This is useful only in **one** very specific scenario, in which two batteries are connected to two separate inverters which are "one way", meaning these inverters can use energy from the panels to charge the battery and use the battery to provide power to the rest of the network, but which cannot use energy from the grid to charge the batteries. 
+
+This parameter is needed only when there are more batteries (and inverters) than the available energy readings (which typically means two of such batteries and inverters), because if there is only one of such batteries and inverters, the only excess power seen by the smart meter is inevitably the power from the only inverter, and this parameter is not needed.
+
+In such a scenario the simulator would not be able to know whether the excess energy (the one normally exported to the grid) come from one or the other inverter, so it would potentially use excess production from one inverter to charge a battery connected behind the other inverter. 
+
+In such an unusual scenario this parameter fixes the issue.
 
 ## Battery Efficiencies
 

@@ -55,6 +55,7 @@ from .const import (
     CONF_ENERGY_TARIFF,
     CONF_EXPORT_SENSOR,
     CONF_IMPORT_SENSOR,
+    CONF_SOLAR_ENERGY_SENSOR,
     CONF_UPDATE_FREQUENCY,
     CONF_INPUT_LIST,
     CONF_RATED_BATTERY_CYCLES,
@@ -83,6 +84,7 @@ from .const import (
     TARIFF_SENSOR,
     IMPORT,
     EXPORT,
+    SOLAR_POWER_CAP,
     SIMULATED_SENSOR,
 )
 from .helpers import (
@@ -97,6 +99,7 @@ BATTERY_CONFIG_SCHEMA = vol.Schema(
         {
             vol.Required(CONF_IMPORT_SENSOR): cv.entity_id,
             vol.Required(CONF_EXPORT_SENSOR): cv.entity_id,
+            vol.Optional(CONF_SOLAR_ENERGY_SENSOR): cv.entity_id,
             vol.Optional(CONF_ENERGY_TARIFF): cv.entity_id,
             vol.Optional(CONF_ENERGY_EXPORT_TARIFF): cv.entity_id,
             vol.Optional(CONF_ENERGY_IMPORT_TARIFF): cv.entity_id,
@@ -297,8 +300,10 @@ class SimulatedBatteryHandle:
         self._charge_percentage: float = 50
         self._charge_state: float = config[CONF_BATTERY_SIZE]*0.5
         self._accumulated_export_reading: float = 0.0
+        self._accumulated_solar_reading: float = 0.0
         self._last_import_reading_sensor_data: str = None
         self._last_export_reading_sensor_data: str = None
+        self._solar_entity_id = config.get(CONF_SOLAR_ENERGY_SENSOR)
         self._listeners = []
         self._pending_update_cancel = None
 
@@ -339,6 +344,7 @@ class SimulatedBatteryHandle:
             ATTR_ENERGY_BATTERY_IN: 0.0,
             CHARGING_RATE: 0.0,
             DISCHARGING_RATE: 0.0,
+            SOLAR_POWER_CAP: 0.0,
             ATTR_MONEY_SAVED: 0.0,
             BATTERY_MODE: MODE_IDLE,
             ATTR_STATUS: "Normal",
@@ -403,6 +409,8 @@ class SimulatedBatteryHandle:
         self._sensors[ATTR_ENERGY_BATTERY_IN] = 0.0
         self._sensors[ATTR_MONEY_SAVED_IMPORT] = 0.0
         self._sensors[ATTR_MONEY_SAVED_EXPORT] = 0.0
+        self._sensors[SOLAR_POWER_CAP] = 0.0
+        self._accumulated_solar_reading = 0.0
 
         self._energy_saved_today = 0.0
         self._energy_saved_week = 0.0
@@ -443,6 +451,15 @@ class SimulatedBatteryHandle:
                 )
             )
         _LOGGER.debug(f"{self._name} monitoring {input_details[SENSOR_ID]}")
+
+        # Track solar sensor if configured
+        if self._solar_entity_id is not None:
+            self._listeners.append(
+                async_track_state_change_event(
+                    self._hass, [self._solar_entity_id], self.async_solar_reading_handler
+                )
+            )
+            _LOGGER.debug(f"{self._name} monitoring solar sensor {self._solar_entity_id}")
 
         # Also update on a fixed cadence so the battery reacts even when meters
         # publish infrequently or when only switches/controls change.
@@ -537,6 +554,58 @@ class SimulatedBatteryHandle:
         # NOTE: battery updates are handled by async_periodic_update().
         return
 
+    @callback
+    def async_solar_reading_handler(self, event):
+        """Handle state changes for solar energy sensor."""
+        sensor_id = event.data.get("entity_id")
+        old_state = event.data.get("old_state")
+        new_state = event.data.get("new_state")
+
+        if (
+            old_state is None
+            or sensor_id is None
+            or new_state is None
+            or old_state.state in [STATE_UNKNOWN, STATE_UNAVAILABLE]
+            or new_state.state in [STATE_UNKNOWN, STATE_UNAVAILABLE]
+        ):
+            # Sensor not ready
+            return
+
+        units = self._hass.states.get(sensor_id).attributes.get(
+            ATTR_UNIT_OF_MEASUREMENT
+        )
+
+        if units in [UnitOfEnergy.KILO_WATT_HOUR, UnitOfEnergy.WATT_HOUR]:
+            conversion_factor = 1.0 if units == UnitOfEnergy.KILO_WATT_HOUR else 0.001
+            unit_of_energy = "kWh" if units == UnitOfEnergy.KILO_WATT_HOUR else "Wh"
+        else:
+            return
+
+        new_state_value = float(new_state.state) * conversion_factor
+        old_state_value = float(old_state.state) * conversion_factor
+
+        if new_state_value == old_state_value:
+            return
+
+        reading_variance = new_state_value - old_state_value
+
+        _LOGGER.debug(
+            f"({self._name}) Solar sensor {sensor_id}: {old_state_value} {unit_of_energy} => {new_state_value} {unit_of_energy} = Δ {reading_variance} {unit_of_energy}"
+        )
+
+        if reading_variance < 0:
+            _LOGGER.debug(
+                "(%s) Solar sensor value decreased - meter may have been reset",
+                self._name,
+            )
+            self._accumulated_solar_reading = 0
+            return
+
+        self._accumulated_solar_reading += reading_variance
+
+        # NOTE: battery updates are handled by async_periodic_update().
+        return
+
     def get_tariff_information(self, input_details):
         if input_details is None:
             return None
@@ -598,10 +667,13 @@ class SimulatedBatteryHandle:
             self._pending_update_cancel = None
 
         self.update_battery(
-            self._accumulated_import_reading, self._accumulated_export_reading
+            self._accumulated_import_reading,
+            self._accumulated_export_reading,
+            self._accumulated_solar_reading,
         )
         self._accumulated_export_reading = 0.0
         self._accumulated_import_reading = 0.0
+        self._accumulated_solar_reading = 0.0
 
     @callback
     def _async_delayed_update(self, _now):
@@ -621,7 +693,7 @@ class SimulatedBatteryHandle:
         """Return current degraded maximum battery capacity in kWh."""
         return max(float(self._battery_size) * self.degradation_factor, 0.000001)
 
-    def update_battery(self, import_amount, export_amount):
+    def update_battery(self, import_amount, export_amount, solar_amount=0.0):
         """Update battery statistics based on the reading for Im- or Export."""
         amount_to_charge: float = 0.0
         amount_to_discharge: float = 0.0
@@ -655,9 +727,19 @@ class SimulatedBatteryHandle:
             self._max_discharge_rate / 3600
         )
         max_charge = time_since_last_battery_update * (self._max_charge_rate / 3600)
-        
+        interval_hours = max(time_since_last_battery_update / 3600, 1 / 3600)
         charge_limit = time_since_last_battery_update * (self._charge_limit / 3600)
         discharge_limit = time_since_last_battery_update * (self._discharge_limit / 3600)
+
+        if self._solar_entity_id is not None:
+            solar_cap = max(float(solar_amount), 0.0)
+            max_charge = min(max_charge, solar_cap)
+            self._sensors[SOLAR_POWER_CAP] = solar_cap / interval_hours
+            _LOGGER.debug(
+                f"({self._name}) Solar cap: {solar_cap} kWh over {interval_hours:.4f} hours = {self._sensors[SOLAR_POWER_CAP]:.3f} kW"
+            )
+        else:
+            self._sensors[SOLAR_POWER_CAP] = 0.0
 
         effective_max_capacity = self.current_max_capacity
         max_charge_soc_capacity = effective_max_capacity * float(self._maximum_soc) / 100
@@ -740,10 +822,6 @@ class SimulatedBatteryHandle:
                 self._sensors[BATTERY_MODE] = MODE_DISCHARGING
             else:
                 self._sensors[BATTERY_MODE] = MODE_IDLE
-
-
-
-        interval_hours = max(time_since_last_battery_update / 3600, 1 / 3600)
         requested_charge_power = (
             amount_to_charge / interval_hours if amount_to_charge > 0 else 0.0
         )

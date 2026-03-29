@@ -25,7 +25,8 @@
           "charge_efficiency": "Laddningseffektivitet eller kurva (t.ex. 0.95 eller 0:0.9, 5:0.95)",
           "rated_battery_cycles": "Nominella battericykler",
           "end_of_life_degradation": "Kapacitet vid slutet av livslängden (0 till 1)",
-          "update_frequency": "Uppdateringsfrekvens i sekunder"
+          "update_frequency": "Uppdateringsfrekvens i sekunder",
+          "solar_energy_sensor": "Solenergisensor"
         },
         "description": "Ställ in specifikationerna för batteriet."
       },
