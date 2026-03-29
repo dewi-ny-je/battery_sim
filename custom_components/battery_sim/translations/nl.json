@@ -1,58 +1,164 @@
 {
   "config": {
     "abort": {
-      "already_configured": "Het apparaat is reeds geconfigureerd."
+      "already_configured": "Het apparaat is al geconfigureerd."
     },
     "error": {
-      "not_float": "Moet een getal zijn"
+      "invalid_input": "Ongeldige invoer"
     },
-    "flow_title": "Nieuwe batterijsimulatie instellen",
+    "flow_title": "Nieuwe gesimuleerde batterij instellen",
     "step": {
       "user": {
         "title": "Selecteer batterij",
         "data": {
-          "battery": "Batterij model"
+          "battery": "Batterijmodel"
         },
-        "description": "Selecteer het te simuleren model uit de lijst, of maak een aangepast model."
+        "description": "Selecteer een batterijmodel om te simuleren uit de lijst of kies Aangepast om er zelf een te maken."
       },
       "custom": {
         "title": "Aangepaste batterij",
         "data": {
-          "size_kwh": "Batterij capaciteit in kWh",
-          "max_discharge_rate_kw": "Maximum ontlaadcapaciteit in kW",
-          "max_charge_rate_kw": "Maximum laadcapaciteit in kW",
+          "unique_name": "Unieke naam",
+          "size_kwh": "Batterijgrootte in kWh",
+          "max_discharge_rate_kw": "Maximale ontlaadsnelheid in kW",
+          "max_charge_rate_kw": "Maximale laadsnelheid in kW",
           "discharge_efficiency": "Ontlaadefficiëntie of curve (bijv. 0.95 of 0:0.9, 5:0.95)",
           "charge_efficiency": "Laadefficiëntie of curve (bijv. 0.95 of 0:0.9, 5:0.95)",
-          "rated_battery_cycles": "Levensduur van de accu in laad- en ontlaadcycli",
-          "end_of_life_degradation": "Capaciteit aan het einde van de levensduur (0 t/m 1)",
+          "rated_battery_cycles": "Nominale batterijcycli",
+          "end_of_life_degradation": "Capaciteit aan het einde van de levensduur (0 tot 1)",
           "update_frequency": "Updatefrequentie in seconden"
         },
-        "description": "Stel de batterijspecificaties in."
+        "description": "Stel de specificaties van de batterij in. Efficiënties kunnen worden ingevoerd als een enkele waarde of als combinaties van vermogen/efficiëntie zoals 0:0.9, 5:0.95. Overweeg om details van de batterij die je simuleert op onze GitHub te delen, zodat we die aan de sjabloonlijst kunnen toevoegen."
       },
-      "metertype": {
-        "title": "Type energiemeter",
-        "data": {
-          "one_import_one_export": "Eén afname- en één teruglevermeter",
-          "two_import_one_export": "Twee afnamemeters en één teruglevermeter"
+      "meter_menu": {
+        "title": "Meters toevoegen",
+        "menu_options": {
+          "add_import_meter": "Importmeter toevoegen (meet energie die vanuit het net het huis binnenkomt)",
+          "add_export_meter": "Exportmeter toevoegen (meet energie die vanuit het huis naar het net gaat)",
+          "all_done": "Alles klaar"
         },
-        "description": "Selecteer het type energiemeter dat je hebt. Afnamemeters meten energie die vanuit het net je woning binnenkomt. Je kunt er twee hebben, bijvoorbeeld één voor overdag en één voor 's nachts. Teruglevermeters meten energie die je woning naar het net verlaat, bijvoorbeeld overtollige zonne-energie."
+        "description": "Er is minimaal één importmeter en één exportmeter vereist. Meters die direct zonne-opwek meten, moeten niet worden toegevoegd."
       },
-      "connectsensors": {
-        "title": "Verbind batterij met energiemetersensoren",
-        "data": {
-          "import_sensor": "Import sensor/meter - binnenkomende energie van het net",
-          "second_import_sensor": "Tweede afnamesensor/-meter - bijvoorbeeld nachtstroom of Economy 7",
-          "export_sensor": "Terugleversensor/-meter - energie teruggeleverd aan het net"
+      "tariff_menu": {
+        "title": "Selecteer tarieftype",
+        "menu_options": {
+          "no_tariff_info": "Geen tarief voor deze meter",
+          "fixed_tariff": "Een vaste constante waarde voor het tarief",
+          "tariff_sensor": "Een sensor die de waarde bevat van een tarief dat in de tijd varieert"
         },
-        "description": "De batterij zal opladen wanneer de export sensor aangeeft dat stroom teruggeleverd wordt aan het net. De batterij zal ontladen wanneer de import sensor aangeeft dat stroom van het net gehaald wordt."
+        "description": ""
       },
-      "connecttariffsensors": {
-        "title": "Verbind sensoren voor energietarieven",
+      "add_import_meter": {
+        "title": "Importmeter aan batterij toevoegen",
         "data": {
-          "energy_import_tariff": "Entiteit voor afnametarief - kosten van energie uit het net (£/kWh)",
-          "energy_export_tariff": "Teruglevertarief - vergoeding voor energie die aan het net wordt teruggeleverd (£/kWh)"
+          "sensor_id": "Energiemetersensor"
         },
-        "description": "Voor vaste tarieven kun je het beste een helper-entiteit met een vaste waarde aanmaken. De valuta wordt bepaald door de locatie-instellingen van Home Assistant en gebruikt meestal de hoofdeenheid (bijvoorbeeld euro) en niet de subeenheid (bijvoorbeeld cent)."
+        "description": "Selecteer metersensor"
+      },
+      "add_export_meter": {
+        "title": "Exportmeter aan batterij toevoegen",
+        "data": {
+          "sensor_id": "Energiemetersensor"
+        },
+        "description": "Selecteer metersensor"
+      },
+      "fixed_tariff": {
+        "title": "Details vast tarief toevoegen",
+        "data": {
+          "fixed_tariff": "Vaste tariefwaarde (indien van toepassing)"
+        },
+        "description": ""
+      },
+      "tariff_sensor": {
+        "title": "Details tariefsensors toevoegen",
+        "data": {
+          "tariff_sensor": "Sensor die het huidige tarief toont (indien van toepassing)"
+        },
+        "description": ""
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Batterijopties",
+        "description": "Selecteer parameters om aan te passen",
+        "menu_options": {
+          "main_params": "Hoofdparameters",
+          "input_sensors": "Meters/sensoren bewerken",
+          "all_done": "Alles klaar"
+        }
+      },
+      "main_params": {
+        "title": "Belangrijkste batterijopties",
+        "description": "Hoofdparameters",
+        "data": {
+          "size_kwh": "Batterijgrootte in kWh",
+          "max_discharge_rate_kw": "Maximale ontlaadsnelheid in kW",
+          "max_charge_rate_kw": "Maximale laadsnelheid in kW",
+          "discharge_efficiency": "Ontlaadefficiëntie of curve (bijv. 0.95 of 0:0.9, 5:0.95)",
+          "charge_efficiency": "Laadefficiëntie of curve (bijv. 0.95 of 0:0.9, 5:0.95)",
+          "rated_battery_cycles": "Nominale batterijcycli",
+          "end_of_life_degradation": "Capaciteit aan het einde van de levensduur (0 tot 1)",
+          "update_frequency": "Updatefrequentie in seconden"
+        }
+      },
+      "input_sensors": {
+        "title": "Meters/sensoren bewerken",
+        "menu_options": {
+          "add_import_meter": "Importmeter toevoegen (meet energie die vanuit het net het huis binnenkomt)",
+          "add_export_meter": "Exportmeter toevoegen (meet energie die vanuit het huis naar het net gaat)",
+          "edit_input_tariff": "Tariefdetails voor een meter bewerken",
+          "delete_input": "Een meter verwijderen"
+        },
+        "description": "Er is minimaal één importmeter en één exportmeter vereist. Meters die direct zonne-opwek meten, moeten niet worden gebruikt."
+      },
+      "tariff_menu": {
+        "title": "Selecteer tarieftype",
+        "menu_options": {
+          "no_tariff_info": "Geen tarief voor deze meter",
+          "fixed_tariff": "Een vaste constante prijs voor het tarief",
+          "tariff_sensor": "Een sensor die de waarde weergeeft van een tarief dat in de tijd varieert"
+        },
+        "description": ""
+      },
+      "add_import_meter": {
+        "title": "Importmeter aan batterij toevoegen",
+        "data": {
+          "sensor_id": "Energiemetersensor"
+        },
+        "description": "Selecteer metersensor"
+      },
+      "add_export_meter": {
+        "title": "Exportmeter aan batterij toevoegen",
+        "data": {
+          "sensor_id": "Energiemetersensor"
+        },
+        "description": "Selecteer metersensor"
+      },
+      "delete_input": {
+        "title": "Selecteer meter om te verwijderen",
+        "data": {},
+        "description": ""
+      },
+      "edit_input_tariff": {
+        "title": "Selecteer meter waarvan je het tarief wilt bewerken",
+        "data": {},
+        "description": ""
+      },
+      "fixed_tariff": {
+        "title": "Vast tarief toevoegen",
+        "data": {
+          "fixed_tariff": "Vaste tariefwaarde"
+        },
+        "description": ""
+      },
+      "tariff_sensor": {
+        "title": "Tariefsensors toevoegen",
+        "data": {
+          "tariff_sensor": "Sensor die het huidige tarief toont"
+        },
+        "description": ""
       }
     }
   },
@@ -62,8 +168,8 @@
       "description": "Stelt de laadstatus van de gesimuleerde batterij in voor een specifiek apparaat",
       "fields": {
         "device_id": {
-          "name": "Doelapparaat",
-          "description": "Het apparaat waarvoor de batterijstatus moet worden ingesteld"
+          "name": "Doelbatterijapparaat",
+          "description": "Apparaat waarvoor de batterijlading moet worden ingesteld"
         },
         "charge_state": {
           "name": "Laadstatus",
