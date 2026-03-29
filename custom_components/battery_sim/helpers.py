@@ -79,10 +79,29 @@ def generate_input_list(config):
 
     if CONF_ENERGY_EXPORT_TARIFF in config:
         inputs[1][tariff_type] = config[CONF_ENERGY_EXPORT_TARIFF]
-    if CONF_SECOND_ENERGY_IMPORT_TARIFF in config:
-        inputs[2][tariff_type] = config[CONF_SECOND_ENERGY_IMPORT_TARIFF]
-    if CONF_SECOND_ENERGY_EXPORT_TARIFF in config:
-        inputs[3][tariff_type] = config[CONF_SECOND_ENERGY_EXPORT_TARIFF]
+
+    def _set_tariff_for_sensor(simulated_sensor, tariff_config_key):
+        if tariff_config_key not in config:
+            return
+        matching_input = next(
+            (
+                input_entry
+                for input_entry in inputs
+                if input_entry[SIMULATED_SENSOR] == simulated_sensor
+            ),
+            None,
+        )
+        if matching_input is not None:
+            matching_input[tariff_type] = config[tariff_config_key]
+
+    _set_tariff_for_sensor(
+        GRID_SECOND_IMPORT_SIM,
+        CONF_SECOND_ENERGY_IMPORT_TARIFF,
+    )
+    _set_tariff_for_sensor(
+        GRID_SECOND_EXPORT_SIM,
+        CONF_SECOND_ENERGY_EXPORT_TARIFF,
+    )
     return inputs
 
 
