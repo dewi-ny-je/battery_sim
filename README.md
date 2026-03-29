@@ -100,6 +100,8 @@ In such a scenario the simulator would not be able to know whether the excess en
 
 In such an unusual scenario this parameter fixes the issue.
 
+To be clear: do NOT set the charge cap to the smart meter energy production: it does not represent how the battery or inverter behave and it will cause undesired (and unrealistic) results.
+
 ## Battery Efficiencies
 
 This integration supports separate `charge_efficiency` and `discharge_efficiency` values because battery efficiency is not flat across the full operating range. In practice, manufacturers often publish an efficiency curve: efficiency changes with charge or discharge power, and lower power levels typically produce worse results than the headline datasheet number.
