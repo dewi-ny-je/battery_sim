@@ -298,14 +298,14 @@ class DisplayOnlySensor(RestoreEntity, SensorEntity):
         state_attr = {}
         for input in self._handle._inputs:
             if self._sensor_type != input[SIMULATED_SENSOR]:
-                break
+                continue
             if input[SENSOR_TYPE] == EXPORT:
-                break
+                continue
             parent_sensor = input[SENSOR_ID]
             if self.hass.states.get(parent_sensor) is None or self.hass.states.get(
                 parent_sensor
             ).state in [STATE_UNAVAILABLE, STATE_UNKNOWN]:
-                break
+                continue
             real_world_value = float(self.hass.states.get(parent_sensor).state)
             simulated_value = self._handle._sensors[self._sensor_type]
             if real_world_value == 0:
@@ -325,6 +325,7 @@ class DisplayOnlySensor(RestoreEntity, SensorEntity):
                         float(percentage_value_saved), 0
                     )
                 }
+            break
         return state_attr
 
     @property
