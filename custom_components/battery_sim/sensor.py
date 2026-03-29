@@ -127,11 +127,12 @@ async def define_sensors(hass, handle):
             handle, DISCHARGING_RATE, SensorDeviceClass.POWER, UnitOfPower.KILO_WATT
         )
     )
-    sensors.append(
-        DisplayOnlySensor(
-            handle, SOLAR_POWER_CAP, SensorDeviceClass.POWER, UnitOfPower.KILO_WATT
+    if handle._solar_entity_id is not None:
+        sensors.append(
+            DisplayOnlySensor(
+                handle, SOLAR_POWER_CAP, SensorDeviceClass.POWER, UnitOfPower.KILO_WATT
+            )
         )
-    )
     sensors.append(DisplayOnlySensor(handle, ATTR_LAST_CHARGE_EFFICIENCY, None, None))
     sensors.append(
         DisplayOnlySensor(handle, ATTR_LAST_DISCHARGE_EFFICIENCY, None, None)
