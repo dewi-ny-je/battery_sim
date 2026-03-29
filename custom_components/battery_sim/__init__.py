@@ -700,7 +700,7 @@ class SimulatedBatteryHandle:
         elif self._battery_mode == FORCE_DISCHARGE:
             _LOGGER.debug("(%s) Battery forced discharging.", self._name)
             amount_to_charge = 0.0
-            amount_to_discharge = min(max_discharge, available_capacity_to_discharge, discharge_limit)
+            amount_to_discharge = min(max_discharge, discharge_limit)
             net_export = max(amount_to_discharge - import_amount, 0) + export_amount
             net_import = max(import_amount - amount_to_discharge, 0)
             self._sensors[BATTERY_MODE] = MODE_FORCE_DISCHARGING
@@ -722,7 +722,7 @@ class SimulatedBatteryHandle:
             _LOGGER.debug("(%s) Battery discharge only mode.", self._name)
             amount_to_charge = 0.0
             amount_to_discharge = min(
-                import_amount, max_discharge, available_capacity_to_discharge, discharge_limit
+                import_amount, max_discharge, discharge_limit
             )
             net_import = import_amount - amount_to_discharge
             net_export = export_amount
@@ -738,7 +738,7 @@ class SimulatedBatteryHandle:
                 export_amount, max_charge, available_capacity_to_charge, charge_limit
             )
             amount_to_discharge = min(
-                import_amount, max_discharge, available_capacity_to_discharge, discharge_limit
+                import_amount, max_discharge, discharge_limit
             )
             net_import = import_amount - amount_to_discharge
             net_export = export_amount - amount_to_charge
@@ -777,9 +777,12 @@ class SimulatedBatteryHandle:
                 available_capacity_to_charge / max(charge_efficiency, 0.000001),
             )
         if amount_to_discharge > 0:
+            discharge_available_limit = (
+                available_capacity_to_discharge * discharge_efficiency
+            )
             amount_to_discharge = min(
                 amount_to_discharge,
-                available_capacity_to_discharge * discharge_efficiency,
+                discharge_available_limit,
             )
 
         if self._battery_mode == OVERRIDE_CHARGING:
