@@ -497,9 +497,17 @@ class SimulatedBatteryHandle:
             ATTR_UNIT_OF_MEASUREMENT
         )
 
-        if units in [UnitOfEnergy.KILO_WATT_HOUR, UnitOfEnergy.WATT_HOUR]:
-            conversion_factor = 1.0 if units == UnitOfEnergy.KILO_WATT_HOUR else 0.001
-            unit_of_energy = "kWh" if units == UnitOfEnergy.KILO_WATT_HOUR else "Wh"
+        if units not in [UnitOfEnergy.KILO_WATT_HOUR, UnitOfEnergy.WATT_HOUR]:
+            _LOGGER.warning(
+                "(%s) Unsupported energy unit '%s' for sensor %s; expected kWh or Wh. Ignoring update.",
+                self._name,
+                units,
+                sensor_id,
+            )
+            return
+
+        conversion_factor = 1.0 if units == UnitOfEnergy.KILO_WATT_HOUR else 0.001
+        unit_of_energy = "kWh" if units == UnitOfEnergy.KILO_WATT_HOUR else "Wh"
 
         new_state_value = float(new_state.state) * conversion_factor
         old_state_value = float(old_state.state) * conversion_factor
