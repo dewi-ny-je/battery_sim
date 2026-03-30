@@ -818,7 +818,6 @@ class SimulatedBatteryHandle:
                 self._sensors[BATTERY_MODE] = MODE_DISCHARGING
             else:
                 self._sensors[BATTERY_MODE] = MODE_IDLE
-        interval_hours = max(time_since_last_battery_update / 3600, 1 / 3600)
         requested_charge_power = (
             amount_to_charge / interval_hours if amount_to_charge > 0 else 0.0
         )
