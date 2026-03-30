@@ -21,8 +21,8 @@ You can also define batteries in `configuration.yaml`. Each battery is created u
 | `import_sensor` | Yes | Entity ID of the cumulative energy-import sensor in kWh, for example the output of a `utility_meter`. |
 | `export_sensor` | Yes | Entity ID of the cumulative energy-export sensor in kWh. |
 | `size_kwh` | Yes | Usable battery capacity in kWh. Use a floating-point value such as `13.5`. |
-| `max_discharge_rate_kw` | Yes | Maximum discharge power in kW. Use a floating-point value such as `5.0`. |
-| `max_charge_rate_kw` | No | Maximum charge power in kW. Defaults to `1.0` if omitted. |
+| `max_discharge_rate_kw` | Yes | Maximum rated discharge power in kW. Use a floating-point value such as `5.0`. The user can limit if further using a field in the device page. |
+| `max_charge_rate_kw` | No | Maximum rated charge power in kW. Defaults to `1.0` if omitted.  The user can limit if further using a field in the device page. |
 | `discharge_efficiency` | No | Battery discharge efficiency from `0` to `1`. If omitted, the integration falls back to `efficiency` when that legacy key is present, otherwise `1.0`. You can enter either a single value between 0 and 1, or a power curve such as `0:0.90, 2.5:0.94, 5:0.95`. |
 | `charge_efficiency` | No | Battery charge efficiency from `0` to `1`. Defaults to `1.0` if omitted. You can enter either a single value between 0 and 1, or a power curve such as `0:0.90, 2.5:0.94, 5:0.95`. |
 | `efficiency` | No | Legacy single-value efficiency key kept for backward compatibility. It is used as the default for `discharge_efficiency` when the newer split efficiency keys are not set. |
