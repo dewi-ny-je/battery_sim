@@ -4,7 +4,7 @@
       "already_configured": "Dieses Gerät ist bereits konfiguriert."
     },
     "error": {
-      "not_float": "Muss eine Zahl sein"
+      "invalid_input": "Ungültige Eingabe"
     },
     "flow_title": "Neue simulierte Batterie einrichten",
     "step": {

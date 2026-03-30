@@ -356,7 +356,7 @@ class SimulatedBatteryHandle:
             ATTR_LAST_DISCHARGE_EFFICIENCY: self._battery_discharge_efficiency_curve[0][1],
         }
         for input_details in self._inputs:
-            self._sensors[input_details[SIMULATED_SENSOR]] = None
+            self._sensors[input_details[SIMULATED_SENSOR]] = 0.0
 
         async_at_start(self._hass, self.async_source_tracking)
 
@@ -394,7 +394,7 @@ class SimulatedBatteryHandle:
 
         dispatcher_send(self._hass, f"{self._name}-{MESSAGE_TYPE_BATTERY_UPDATE}")
         return
-        
+
     def async_reset_battery(self):
         """Reset the battery to start over."""
         _LOGGER.debug("Reset battery")
@@ -514,9 +514,17 @@ class SimulatedBatteryHandle:
             ATTR_UNIT_OF_MEASUREMENT
         )
 
-        if units in [UnitOfEnergy.KILO_WATT_HOUR, UnitOfEnergy.WATT_HOUR]:
-            conversion_factor = 1.0 if units == UnitOfEnergy.KILO_WATT_HOUR else 0.001
-            unit_of_energy = "kWh" if units == UnitOfEnergy.KILO_WATT_HOUR else "Wh"
+        if units not in [UnitOfEnergy.KILO_WATT_HOUR, UnitOfEnergy.WATT_HOUR]:
+            _LOGGER.warning(
+                "(%s) Unsupported energy unit '%s' for sensor %s; expected kWh or Wh. Ignoring update.",
+                self._name,
+                units,
+                sensor_id,
+            )
+            return
+
+        conversion_factor = 1.0 if units == UnitOfEnergy.KILO_WATT_HOUR else 0.001
+        unit_of_energy = "kWh" if units == UnitOfEnergy.KILO_WATT_HOUR else "Wh"
 
         new_state_value = float(new_state.state) * conversion_factor
         old_state_value = float(old_state.state) * conversion_factor
@@ -640,7 +648,7 @@ class SimulatedBatteryHandle:
             self._maximum_soc = value
         else:
             _LOGGER.error("Unknown slider type in __init__.py")
-        
+
     @callback
     def async_trigger_update(self):
         """Apply pending readings and current controls immediately."""
@@ -758,16 +766,12 @@ class SimulatedBatteryHandle:
             _LOGGER.debug("(%s) Battery paused.", self._name)
             amount_to_charge = 0.0
             amount_to_discharge = 0.0
-            net_export = export_amount
-            net_import = import_amount
             self._sensors[BATTERY_MODE] = MODE_IDLE
 
         elif self._battery_mode == OVERRIDE_CHARGING:
             _LOGGER.debug("(%s) Battery override charging.", self._name)
             amount_to_charge = min(max_charge, available_capacity_to_charge, charge_limit)
             amount_to_discharge = 0.0
-            net_export = max(export_amount - amount_to_charge, 0)
-            net_import = max(amount_to_charge - export_amount, 0) + import_amount
             self._charging = True
             self._sensors[BATTERY_MODE] = MODE_FORCE_CHARGING
 
@@ -775,8 +779,6 @@ class SimulatedBatteryHandle:
             _LOGGER.debug("(%s) Battery forced discharging.", self._name)
             amount_to_charge = 0.0
             amount_to_discharge = min(max_discharge, available_capacity_to_discharge, discharge_limit)
-            net_export = max(amount_to_discharge - import_amount, 0) + export_amount
-            net_import = max(import_amount - amount_to_discharge, 0)
             self._sensors[BATTERY_MODE] = MODE_FORCE_DISCHARGING
 
         elif self._battery_mode == CHARGE_ONLY:
@@ -785,8 +787,6 @@ class SimulatedBatteryHandle:
                 export_amount, max_charge, available_capacity_to_charge, charge_limit
             )
             amount_to_discharge = 0.0
-            net_import = import_amount
-            net_export = export_amount - amount_to_charge
             if amount_to_charge > 0.0:
                 self._sensors[BATTERY_MODE] = MODE_CHARGING
             else:
@@ -798,8 +798,6 @@ class SimulatedBatteryHandle:
             amount_to_discharge = min(
                 import_amount, max_discharge, available_capacity_to_discharge, discharge_limit
             )
-            net_import = import_amount - amount_to_discharge
-            net_export = export_amount
             if amount_to_discharge > 0.0:
                 self._sensors[BATTERY_MODE] = MODE_DISCHARGING
             else:
@@ -814,14 +812,13 @@ class SimulatedBatteryHandle:
             amount_to_discharge = min(
                 import_amount, max_discharge, available_capacity_to_discharge, discharge_limit
             )
-            net_import = import_amount - amount_to_discharge
-            net_export = export_amount - amount_to_charge
             if amount_to_charge > 0.0 and amount_to_charge >= amount_to_discharge:
                 self._sensors[BATTERY_MODE] = MODE_CHARGING
             elif amount_to_discharge > 0.0:
                 self._sensors[BATTERY_MODE] = MODE_DISCHARGING
             else:
                 self._sensors[BATTERY_MODE] = MODE_IDLE
+        interval_hours = max(time_since_last_battery_update / 3600, 1 / 3600)
         requested_charge_power = (
             amount_to_charge / interval_hours if amount_to_charge > 0 else 0.0
         )
@@ -852,6 +849,8 @@ class SimulatedBatteryHandle:
                 available_capacity_to_discharge * discharge_efficiency,
             )
 
+        # Calculate net grid import/export once, using efficiency-adjusted
+        # charge/discharge amounts.
         if self._battery_mode == OVERRIDE_CHARGING:
             net_export = max(export_amount - amount_to_charge, 0)
             net_import = max(amount_to_charge - export_amount, 0) + import_amount

@@ -65,6 +65,7 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+_INVALID_RESTORED_STATES = {None, "", STATE_UNKNOWN, STATE_UNAVAILABLE}
 
 DEVICE_CLASS_MAP = {
     UnitOfEnergy.WATT_HOUR: SensorDeviceClass.ENERGY,
@@ -214,18 +215,29 @@ class DisplayOnlySensor(RestoreEntity, SensorEntity):
         state = await self.async_get_last_state()
 
         if state:
-            try:
-                self._handle._sensors[self._sensor_type] = float(state.state)
-                last_reset = state.attributes.get(ATTR_LAST_RESET)
-                if self._supports_last_reset and last_reset is not None:
-                    parsed_last_reset = dt_util.parse_datetime(last_reset)
-                    if parsed_last_reset is not None:
-                        self._last_reset = dt_util.as_utc(parsed_last_reset)
-                self._available = True
-                await self.async_update_ha_state(True)
-            except Exception:
-                _LOGGER.debug("Sensor state not restored properly.")
-                self._available = False
+            if state.state in _INVALID_RESTORED_STATES:
+                _LOGGER.debug(
+                    "Ignoring invalid restored state '%s' for sensor '%s'.",
+                    state.state,
+                    self._sensor_type,
+                )
+            else:
+                try:
+                    self._handle._sensors[self._sensor_type] = float(state.state)
+                    last_reset = state.attributes.get(ATTR_LAST_RESET)
+                    if self._supports_last_reset and last_reset is not None:
+                        parsed_last_reset = dt_util.parse_datetime(last_reset)
+                        if parsed_last_reset is not None:
+                            self._last_reset = dt_util.as_utc(parsed_last_reset)
+                    self._available = True
+                    await self.async_update_ha_state(True)
+                except (TypeError, ValueError):
+                    _LOGGER.debug(
+                        "Sensor state '%s' not restored properly for '%s'.",
+                        state.state,
+                        self._sensor_type,
+                    )
+                    self._available = False
         else:
             _LOGGER.debug("No sensor state - presume new battery.")
             self._available = False
@@ -259,10 +271,13 @@ class DisplayOnlySensor(RestoreEntity, SensorEntity):
     @property
     def native_value(self):
         """Return the state of the sensor."""
+        sensor_value = self._handle._sensors.get(self._sensor_type)
+        if sensor_value is None:
+            return None
         if self._sensor_type == ATTR_MONEY_SAVED:
-            return round(float(self._handle._sensors[self._sensor_type]), 2)
+            return round(sensor_value, 2)
         else:
-            return round(float(self._handle._sensors[self._sensor_type]), 3)
+            return round(sensor_value, 3)
 
     @property
     def device_class(self):
@@ -293,14 +308,14 @@ class DisplayOnlySensor(RestoreEntity, SensorEntity):
         state_attr = {}
         for input in self._handle._inputs:
             if self._sensor_type != input[SIMULATED_SENSOR]:
-                break
+                continue
             if input[SENSOR_TYPE] == EXPORT:
-                break
+                continue
             parent_sensor = input[SENSOR_ID]
             if self.hass.states.get(parent_sensor) is None or self.hass.states.get(
                 parent_sensor
             ).state in [STATE_UNAVAILABLE, STATE_UNKNOWN]:
-                break
+                continue
             real_world_value = float(self.hass.states.get(parent_sensor).state)
             simulated_value = self._handle._sensors[self._sensor_type]
             if real_world_value == 0:
@@ -320,6 +335,7 @@ class DisplayOnlySensor(RestoreEntity, SensorEntity):
                         float(percentage_value_saved), 0
                     )
                 }
+            break
         return state_attr
 
     @property
@@ -329,14 +345,17 @@ class DisplayOnlySensor(RestoreEntity, SensorEntity):
     @property
     def state(self):
         """Return the state of the sensor."""
+        sensor_value = self._handle._sensors.get(self._sensor_type)
+        if sensor_value is None:
+            return None
         if self._sensor_type in [
             ATTR_MONEY_SAVED,
             ATTR_MONEY_SAVED_EXPORT,
             ATTR_MONEY_SAVED_IMPORT,
         ]:
-            return round(float(self._handle._sensors[self._sensor_type]), 2)
+            return round(sensor_value, 2)
         else:
-            return round(float(self._handle._sensors[self._sensor_type]), 3)
+            return round(sensor_value, 3)
 
     def update(self):
         """Not used."""
@@ -374,9 +393,23 @@ class SimulatedBattery(RestoreEntity, SensorEntity):
 
         state = await self.async_get_last_state()
         if state:
-            self.handle._charge_state = min(
-                float(state.state), self.handle.current_max_capacity
-            )
+            if state.state in _INVALID_RESTORED_STATES:
+                _LOGGER.debug(
+                    "Ignoring invalid restored battery state '%s' for '%s'.",
+                    state.state,
+                    self._name,
+                )
+            else:
+                try:
+                    self.handle._charge_state = min(
+                        float(state.state), self.handle.current_max_capacity
+                    )
+                except (TypeError, ValueError):
+                    _LOGGER.debug(
+                        "Battery state '%s' not restored properly for '%s'.",
+                        state.state,
+                        self._name,
+                    )
             if ATTR_DATE_RECORDING_STARTED in state.attributes:
                 self.handle._date_recording_started = state.attributes[
                     ATTR_DATE_RECORDING_STARTED

@@ -4,7 +4,7 @@
       "already_configured": "This device is already configured."
     },
     "error": {
-      "not_float": "Needs to be a number"
+      "invalid_input": "Invalid input"
     },
     "flow_title": "Setup new simulated battery",
     "step": {
