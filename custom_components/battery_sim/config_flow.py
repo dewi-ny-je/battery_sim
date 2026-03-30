@@ -28,6 +28,7 @@ from .const import (
     CONF_UPDATE_FREQUENCY,
     CONF_INPUT_LIST,
     CONF_RATED_BATTERY_CYCLES,
+    CONF_SOLAR_ENERGY_SENSOR,
     CONF_UNIQUE_NAME,
     SETUP_TYPE,
     CONFIG_FLOW,
@@ -111,6 +112,9 @@ class BatterySetupConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 self._data[SETUP_TYPE] = CONFIG_FLOW
                 self._data[CONF_NAME] = f"{self._data[CONF_UNIQUE_NAME]}"
                 self._data[CONF_INPUT_LIST] = []
+                self._data[CONF_SOLAR_ENERGY_SENSOR] = user_input.get(
+                    CONF_SOLAR_ENERGY_SENSOR
+                )
                 await self.async_set_unique_id(self._data[CONF_NAME])
                 self._abort_if_unique_id_configured()
                 return await self.async_step_meter_menu()
@@ -141,6 +145,9 @@ class BatterySetupConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     ),
                     vol.Required(CONF_UPDATE_FREQUENCY, default=60): vol.All(
                         vol.Coerce(int), vol.Range(min=1)
+                    ),
+                    vol.Optional(CONF_SOLAR_ENERGY_SENSOR): EntitySelector(
+                        EntitySelectorConfig(device_class=SensorDeviceClass.ENERGY)
                     ),
                 }
             ),
@@ -317,6 +324,12 @@ class BatteryOptionsFlowHandler(config_entries.OptionsFlow):
                 self.updated_entry[CONF_UPDATE_FREQUENCY] = user_input[
                     CONF_UPDATE_FREQUENCY
                 ]
+                if user_input.get(CONF_SOLAR_ENERGY_SENSOR):
+                    self.updated_entry[CONF_SOLAR_ENERGY_SENSOR] = user_input[
+                        CONF_SOLAR_ENERGY_SENSOR
+                    ]
+                else:
+                    self.updated_entry.pop(CONF_SOLAR_ENERGY_SENSOR, None)
                 self.hass.config_entries.async_update_entry(
                     self._active_config_entry,
                     data=self.updated_entry,
@@ -367,6 +380,14 @@ class BatteryOptionsFlowHandler(config_entries.OptionsFlow):
                 CONF_UPDATE_FREQUENCY,
                 default=self.updated_entry.get(CONF_UPDATE_FREQUENCY, 60),
             ): vol.All(vol.Coerce(int), vol.Range(min=1)),
+            vol.Optional(
+                CONF_SOLAR_ENERGY_SENSOR,
+                description={
+                    "suggested_value": self.updated_entry.get(CONF_SOLAR_ENERGY_SENSOR)
+                },
+            ): EntitySelector(
+                EntitySelectorConfig(device_class=SensorDeviceClass.ENERGY)
+            ),
         }
         return self.async_show_form(
             step_id="main_params",

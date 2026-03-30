@@ -25,8 +25,9 @@
           "discharge_efficiency": "Ontlaadefficiëntie of curve (bijv. 0.95 of 0:0.9, 5:0.95)",
           "charge_efficiency": "Laadefficiëntie of curve (bijv. 0.95 of 0:0.9, 5:0.95)",
           "rated_battery_cycles": "Nominale batterijcycli",
-          "end_of_life_degradation": "Capaciteit aan het einde van de levensduur (0 tot 1)",
-          "update_frequency": "Updatefrequentie in seconden"
+          "end_of_life_degradation": "Capaciteit aan het einde van de levensduur (0 t/m 1)",
+          "update_frequency": "Updatefrequentie in seconden",
+          "solar_energy_sensor": "Solarenergie sensor"
         },
         "description": "Stel de specificaties van de batterij in. Efficiënties kunnen worden ingevoerd als een enkele waarde of als combinaties van vermogen/efficiëntie zoals 0:0.9, 5:0.95. Overweeg om details van de batterij die je simuleert op onze GitHub te delen, zodat we die aan de sjabloonlijst kunnen toevoegen."
       },
