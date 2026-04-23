@@ -401,14 +401,23 @@ class SimulatedBatteryHandle:
         for input in self._inputs:
             self.reset_sim_sensor(input[SIMULATED_SENSOR])
 
-        self._charge_state = 0.0
+        self._charge_state = self.current_max_capacity * 0.5
+        self._charge_percentage = 50
 
         self._sensors[ATTR_ENERGY_SAVED] = 0.0
         self._sensors[ATTR_MONEY_SAVED] = 0.0
         self._sensors[ATTR_ENERGY_BATTERY_OUT] = 0.0
         self._sensors[ATTR_ENERGY_BATTERY_IN] = 0.0
+        self._sensors[CHARGING_RATE] = 0.0
+        self._sensors[DISCHARGING_RATE] = 0.0
+        self._sensors[BATTERY_MODE] = MODE_IDLE
+        self._sensors[ATTR_STATUS] = "Normal"
         self._sensors[ATTR_MONEY_SAVED_IMPORT] = 0.0
         self._sensors[ATTR_MONEY_SAVED_EXPORT] = 0.0
+        self._sensors[BATTERY_CYCLES] = 0.0
+        self._sensors[BATTERY_DEGRADATION] = 1.0
+        self._sensors[ATTR_LAST_CHARGE_EFFICIENCY] = self._battery_charge_efficiency_curve[0][1]
+        self._sensors[ATTR_LAST_DISCHARGE_EFFICIENCY] = self._battery_discharge_efficiency_curve[0][1]
         self._sensors[SOLAR_POWER_CAP] = 0.0
         self._accumulated_solar_reading = 0.0
 
