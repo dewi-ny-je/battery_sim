@@ -135,6 +135,11 @@ CONFIG_SCHEMA = vol.Schema(
 
 _LOGGER = logging.getLogger(__name__)
 
+INITIAL_SOC_RATIO = 0.5
+INITIAL_CHARGE_PERCENTAGE = 50
+DEFAULT_BATTERY_STATUS = "Normal"
+DEFAULT_BATTERY_DEGRADATION = 1.0
+
 
 async def async_setup(hass, config):
     """Set up battery platforms from a YAML."""
@@ -280,6 +285,13 @@ async def async_unload_entry(hass, config_entry):
 class SimulatedBatteryHandle:
     """Representation of the battery itself."""
 
+    @staticmethod
+    def _safe_curve_efficiency(curve, fallback=1.0):
+        """Return first efficiency value from a curve, or fallback when unavailable."""
+        if curve and isinstance(curve[0], (list, tuple)) and len(curve[0]) > 1:
+            return curve[0][1]
+        return fallback
+
     def __init__(self, config, hass):
         """Initialize the Battery."""
         self._hass = hass
@@ -297,8 +309,8 @@ class SimulatedBatteryHandle:
         self._discharge_limit = config[CONF_BATTERY_MAX_DISCHARGE_RATE]
         self._minimum_soc: float = 0
         self._maximum_soc: float = 100
-        self._charge_percentage: float = 50
-        self._charge_state: float = config[CONF_BATTERY_SIZE]*0.5
+        self._charge_percentage: float = INITIAL_CHARGE_PERCENTAGE
+        self._charge_state: float = config[CONF_BATTERY_SIZE] * INITIAL_SOC_RATIO
         self._accumulated_export_reading: float = 0.0
         self._accumulated_solar_reading: float = 0.0
         self._last_import_reading_sensor_data: str = None
@@ -338,6 +350,12 @@ class SimulatedBatteryHandle:
         }
         self._battery_mode = DEFAULT_MODE
 
+        default_charge_efficiency = self._safe_curve_efficiency(
+            self._battery_charge_efficiency_curve
+        )
+        default_discharge_efficiency = self._safe_curve_efficiency(
+            self._battery_discharge_efficiency_curve
+        )
         self._sensors: dict = {
             ATTR_ENERGY_SAVED: 0.0,
             ATTR_ENERGY_BATTERY_OUT: 0.0,
@@ -347,13 +365,13 @@ class SimulatedBatteryHandle:
             SOLAR_POWER_CAP: 0.0,
             ATTR_MONEY_SAVED: 0.0,
             BATTERY_MODE: MODE_IDLE,
-            ATTR_STATUS: "Normal",
+            ATTR_STATUS: DEFAULT_BATTERY_STATUS,
             ATTR_MONEY_SAVED_IMPORT: 0.0,
             ATTR_MONEY_SAVED_EXPORT: 0.0,
             BATTERY_CYCLES: 0.0,
-            BATTERY_DEGRADATION: 1.0,
-            ATTR_LAST_CHARGE_EFFICIENCY: self._battery_charge_efficiency_curve[0][1],
-            ATTR_LAST_DISCHARGE_EFFICIENCY: self._battery_discharge_efficiency_curve[0][1],
+            BATTERY_DEGRADATION: DEFAULT_BATTERY_DEGRADATION,
+            ATTR_LAST_CHARGE_EFFICIENCY: default_charge_efficiency,
+            ATTR_LAST_DISCHARGE_EFFICIENCY: default_discharge_efficiency,
         }
         for input_details in self._inputs:
             self._sensors[input_details[SIMULATED_SENSOR]] = 0.0
@@ -401,8 +419,15 @@ class SimulatedBatteryHandle:
         for input in self._inputs:
             self.reset_sim_sensor(input[SIMULATED_SENSOR])
 
-        self._charge_state = self.current_max_capacity * 0.5
-        self._charge_percentage = 50
+        self._charge_state = self.current_max_capacity * INITIAL_SOC_RATIO
+        self._charge_percentage = INITIAL_CHARGE_PERCENTAGE
+
+        default_charge_efficiency = self._safe_curve_efficiency(
+            self._battery_charge_efficiency_curve
+        )
+        default_discharge_efficiency = self._safe_curve_efficiency(
+            self._battery_discharge_efficiency_curve
+        )
 
         self._sensors[ATTR_ENERGY_SAVED] = 0.0
         self._sensors[ATTR_MONEY_SAVED] = 0.0
@@ -411,13 +436,13 @@ class SimulatedBatteryHandle:
         self._sensors[CHARGING_RATE] = 0.0
         self._sensors[DISCHARGING_RATE] = 0.0
         self._sensors[BATTERY_MODE] = MODE_IDLE
-        self._sensors[ATTR_STATUS] = "Normal"
+        self._sensors[ATTR_STATUS] = DEFAULT_BATTERY_STATUS
         self._sensors[ATTR_MONEY_SAVED_IMPORT] = 0.0
         self._sensors[ATTR_MONEY_SAVED_EXPORT] = 0.0
         self._sensors[BATTERY_CYCLES] = 0.0
-        self._sensors[BATTERY_DEGRADATION] = 1.0
-        self._sensors[ATTR_LAST_CHARGE_EFFICIENCY] = self._battery_charge_efficiency_curve[0][1]
-        self._sensors[ATTR_LAST_DISCHARGE_EFFICIENCY] = self._battery_discharge_efficiency_curve[0][1]
+        self._sensors[BATTERY_DEGRADATION] = DEFAULT_BATTERY_DEGRADATION
+        self._sensors[ATTR_LAST_CHARGE_EFFICIENCY] = default_charge_efficiency
+        self._sensors[ATTR_LAST_DISCHARGE_EFFICIENCY] = default_discharge_efficiency
         self._sensors[SOLAR_POWER_CAP] = 0.0
         self._accumulated_solar_reading = 0.0
 
