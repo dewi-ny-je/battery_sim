@@ -134,6 +134,7 @@ CONFIG_SCHEMA = vol.Schema(
 )
 
 _LOGGER = logging.getLogger(__name__)
+SERVICE_REGISTRATION_KEY = f"{DOMAIN}_services_registered"
 
 INITIAL_SOC_RATIO = 0.5
 INITIAL_CHARGE_PERCENTAGE = 50
@@ -219,7 +220,7 @@ async def async_setup_entry(hass, entry) -> bool:
         else:
             _LOGGER.error("No handle matched for device_id: %s", device_id)
 
-    if not hass.services.has_service(DOMAIN, "set_battery_charge_state"):
+    if not hass.data.get(SERVICE_REGISTRATION_KEY):
         hass.services.async_register(
             DOMAIN,
             "set_battery_charge_state",
@@ -230,7 +231,6 @@ async def async_setup_entry(hass, entry) -> bool:
             }),
         )
 
-    if not hass.services.has_service(DOMAIN, "set_battery_cycles"):
         hass.services.async_register(
             DOMAIN,
             "set_battery_cycles",
@@ -240,6 +240,7 @@ async def async_setup_entry(hass, entry) -> bool:
                 vol.Required("battery_cycles"): vol.All(vol.Coerce(float), vol.Range(min=0))
             }),
         )
+        hass.data[SERVICE_REGISTRATION_KEY] = True
 
     handle._listeners.append(entry.add_update_listener(async_update_settings))
 
@@ -279,10 +280,13 @@ async def async_unload_entry(hass, config_entry):
 
     _LOGGER.debug("Unload integration")
     if unload_ok:
-        hass.data[DOMAIN].pop(config_entry.entry_id, None)
-        if not hass.data[DOMAIN]:
+        if DOMAIN in hass.data:
+            hass.data[DOMAIN].pop(config_entry.entry_id, None)
+        if DOMAIN in hass.data and not hass.data[DOMAIN]:
             hass.services.async_remove(DOMAIN, "set_battery_charge_state")
             hass.services.async_remove(DOMAIN, "set_battery_cycles")
+            hass.data.pop(SERVICE_REGISTRATION_KEY, None)
+            hass.data.pop(DOMAIN, None)
 
     return unload_ok
 
