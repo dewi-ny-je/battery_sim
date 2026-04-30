@@ -800,58 +800,69 @@ class SimulatedBatteryHandle:
             _LOGGER.debug("(%s) Battery paused.", self._name)
             amount_to_charge = 0.0
             amount_to_discharge = 0.0
-            self._sensors[BATTERY_MODE] = MODE_IDLE
 
         elif self._battery_mode == OVERRIDE_CHARGING:
             _LOGGER.debug("(%s) Battery override charging.", self._name)
-            amount_to_charge = min(max_charge, available_capacity_to_charge, charge_limit)
+            amount_to_charge = min(max_charge, charge_limit)
             amount_to_discharge = 0.0
             self._charging = True
-            self._sensors[BATTERY_MODE] = MODE_FORCE_CHARGING
 
         elif self._battery_mode == FORCE_DISCHARGE:
             _LOGGER.debug("(%s) Battery forced discharging.", self._name)
             amount_to_charge = 0.0
-            amount_to_discharge = min(max_discharge, available_capacity_to_discharge, discharge_limit)
-            self._sensors[BATTERY_MODE] = MODE_FORCE_DISCHARGING
+            amount_to_discharge = min(max_discharge, discharge_limit)
 
         elif self._battery_mode == CHARGE_ONLY:
             _LOGGER.debug("(%s) Battery charge only mode.", self._name)
-            amount_to_charge = min(
-                export_amount, max_charge, available_capacity_to_charge, charge_limit
-            )
+            amount_to_charge = min(export_amount, max_charge, charge_limit)
             amount_to_discharge = 0.0
-            if amount_to_charge > 0.0:
-                self._sensors[BATTERY_MODE] = MODE_CHARGING
-            else:
-                self._sensors[BATTERY_MODE] = MODE_IDLE
 
         elif self._battery_mode == DISCHARGE_ONLY:
             _LOGGER.debug("(%s) Battery discharge only mode.", self._name)
             amount_to_charge = 0.0
-            amount_to_discharge = min(
-                import_amount, max_discharge, available_capacity_to_discharge, discharge_limit
-            )
-            if amount_to_discharge > 0.0:
-                self._sensors[BATTERY_MODE] = MODE_DISCHARGING
-            else:
-                self._sensors[BATTERY_MODE] = MODE_IDLE
+            amount_to_discharge = min(import_amount, max_discharge, discharge_limit)
 
         else:
             _LOGGER.debug("(%s) Battery normal mode.", self._name)
 
-            amount_to_charge = min(
-                export_amount, max_charge, available_capacity_to_charge, charge_limit
+            amount_to_charge = min(export_amount, max_charge, charge_limit)
+            amount_to_discharge = min(import_amount, max_discharge, discharge_limit)
+
+        # Keep amount_to_charge as input-side energy and amount_to_discharge as
+        # output-side delivered energy. The SoC capacities are battery-internal,
+        # so convert those limits through the efficiency curve. Because the
+        # efficiency curve is power-dependent, recompute it after each clipping
+        # step until the clipped amount and efficiency agree.
+        for _ in range(10):
+            if amount_to_charge <= 0.0:
+                break
+            charge_efficiency = interpolate_efficiency(
+                self._battery_charge_efficiency_curve,
+                amount_to_charge / interval_hours,
             )
-            amount_to_discharge = min(
-                import_amount, max_discharge, available_capacity_to_discharge, discharge_limit
+            clipped_amount_to_charge = min(
+                amount_to_charge,
+                available_capacity_to_charge / max(charge_efficiency, 0.000001),
             )
-            if amount_to_charge > 0.0 and amount_to_charge >= amount_to_discharge:
-                self._sensors[BATTERY_MODE] = MODE_CHARGING
-            elif amount_to_discharge > 0.0:
-                self._sensors[BATTERY_MODE] = MODE_DISCHARGING
-            else:
-                self._sensors[BATTERY_MODE] = MODE_IDLE
+            if abs(clipped_amount_to_charge - amount_to_charge) < 0.000001:
+                break
+            amount_to_charge = clipped_amount_to_charge
+
+        for _ in range(10):
+            if amount_to_discharge <= 0.0:
+                break
+            discharge_efficiency = interpolate_efficiency(
+                self._battery_discharge_efficiency_curve,
+                amount_to_discharge / interval_hours,
+            )
+            clipped_amount_to_discharge = min(
+                amount_to_discharge,
+                available_capacity_to_discharge * discharge_efficiency,
+            )
+            if abs(clipped_amount_to_discharge - amount_to_discharge) < 0.000001:
+                break
+            amount_to_discharge = clipped_amount_to_discharge
+
         requested_charge_power = (
             amount_to_charge / interval_hours if amount_to_charge > 0 else 0.0
         )
@@ -871,16 +882,22 @@ class SimulatedBatteryHandle:
             discharge_efficiency if amount_to_discharge > 0 else None
         )
 
-        if amount_to_charge > 0:
-            amount_to_charge = min(
-                amount_to_charge,
-                available_capacity_to_charge / max(charge_efficiency, 0.000001),
+        if self._switches[PAUSE_BATTERY] or self._battery_mode == PAUSE_BATTERY:
+            self._sensors[BATTERY_MODE] = MODE_IDLE
+        elif self._battery_mode == OVERRIDE_CHARGING:
+            self._sensors[BATTERY_MODE] = (
+                MODE_FORCE_CHARGING if amount_to_charge > 0.0 else MODE_IDLE
             )
-        if amount_to_discharge > 0:
-            amount_to_discharge = min(
-                amount_to_discharge,
-                available_capacity_to_discharge * discharge_efficiency,
+        elif self._battery_mode == FORCE_DISCHARGE:
+            self._sensors[BATTERY_MODE] = (
+                MODE_FORCE_DISCHARGING if amount_to_discharge > 0.0 else MODE_IDLE
             )
+        elif amount_to_charge > 0.0 and amount_to_charge >= amount_to_discharge:
+            self._sensors[BATTERY_MODE] = MODE_CHARGING
+        elif amount_to_discharge > 0.0:
+            self._sensors[BATTERY_MODE] = MODE_DISCHARGING
+        else:
+            self._sensors[BATTERY_MODE] = MODE_IDLE
 
         # Calculate net grid import/export once, using efficiency-adjusted
         # charge/discharge amounts.
