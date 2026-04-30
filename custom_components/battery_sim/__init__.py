@@ -1,10 +1,10 @@
 """Simulates a battery to evaluate how much energy it could save."""
 import logging
-import time
 import asyncio
 from datetime import timedelta
 
 import voluptuous as vol
+import homeassistant.util.dt as dt_util
 
 from homeassistant.core import callback
 from homeassistant.helpers import device_registry as dr
@@ -295,12 +295,12 @@ class SimulatedBatteryHandle:
     def __init__(self, config, hass):
         """Initialize the Battery."""
         self._hass = hass
-        self._date_recording_started = time.asctime()
+        self._date_recording_started = dt_util.now().isoformat()
         self._name = config[CONF_NAME]
         self._sensor_collection: list = []
         self._charging: bool = False
         self._accumulated_import_reading: float = 0.0
-        self._last_battery_update_time = time.time()
+        self._last_battery_update_time = dt_util.utcnow().timestamp()
         # Periodic update cadence (seconds). Falls back to 60 for backwards compatibility.
         self._update_frequency = config.get(CONF_UPDATE_FREQUENCY, 60)
         self._max_discharge: float = 0.0
@@ -450,7 +450,7 @@ class SimulatedBatteryHandle:
         self._energy_saved_week = 0.0
         self._energy_saved_month = 0.0
 
-        self._date_recording_started = time.asctime()
+        self._date_recording_started = dt_util.now().isoformat()
         dispatcher_send(self._hass, f"{self._name}-{MESSAGE_TYPE_BATTERY_UPDATE}")
         return
 
@@ -690,7 +690,7 @@ class SimulatedBatteryHandle:
 
     def _async_maybe_update_battery(self):
         """Apply pending readings once the minimum update interval has elapsed."""
-        elapsed_seconds = time.time() - self._last_battery_update_time
+        elapsed_seconds = dt_util.utcnow().timestamp() - self._last_battery_update_time
         if elapsed_seconds < MINIMUM_UPDATE_INTERVAL_SECONDS:
             delay = MINIMUM_UPDATE_INTERVAL_SECONDS - elapsed_seconds
             if self._pending_update_cancel is None:
@@ -749,7 +749,7 @@ class SimulatedBatteryHandle:
             Calculate maximum possible charge and discharge based on battery
             specifications and time since last discharge
         """
-        time_now = time.time()
+        time_now = dt_util.utcnow().timestamp()
         time_last_update = self._last_battery_update_time
         time_since_last_battery_update = time_now - time_last_update
 
@@ -979,12 +979,19 @@ class SimulatedBatteryHandle:
         else:
             self._sensors[ATTR_STATUS] = "Normal"
 
-        """Reset day/week/month counters"""
-        if time.strftime("%w") != time.strftime("%w", time.gmtime(time_last_update)):
+        # Reset day/week/month counters using Home Assistant's configured timezone.
+        now_local = dt_util.now()
+        last_update_local = dt_util.as_local(
+            dt_util.utc_from_timestamp(time_last_update)
+        )
+        if now_local.date() != last_update_local.date():
             self._energy_saved_today = 0
-        if time.strftime("%U") != time.strftime("%U", time.gmtime(time_last_update)):
+        if now_local.isocalendar()[:2] != last_update_local.isocalendar()[:2]:
             self._energy_saved_week = 0
-        if time.strftime("%m") != time.strftime("%m", time.gmtime(time_last_update)):
+        if (now_local.year, now_local.month) != (
+            last_update_local.year,
+            last_update_local.month,
+        ):
             self._energy_saved_month = 0
 
         self._last_battery_update_time = time_now
