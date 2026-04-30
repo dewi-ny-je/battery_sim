@@ -193,7 +193,7 @@ async def async_setup_entry(hass, entry) -> bool:
 
         # Match to correct handle by comparing identifiers
         for handle_entry in hass.data[DOMAIN].values():
-            if (DOMAIN, handle_entry._name) in device.identifiers:
+            if handle_entry.device_identifier in device.identifiers:
                 handle_entry.async_set_battery_charge_state(state)
                 _LOGGER.debug("Battery charge updated for device %s", handle_entry._name)
                 break
@@ -212,7 +212,7 @@ async def async_setup_entry(hass, entry) -> bool:
             return
 
         for handle_entry in hass.data[DOMAIN].values():
-            if (DOMAIN, handle_entry._name) in device.identifiers:
+            if handle_entry.device_identifier in device.identifiers:
                 handle_entry.async_set_battery_cycles(cycles)
                 _LOGGER.debug("Battery cycles updated for device %s", handle_entry._name)
                 break
