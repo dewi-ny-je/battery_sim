@@ -1,10 +1,10 @@
 """Simulates a battery to evaluate how much energy it could save."""
 import logging
-import time
 import asyncio
 from datetime import timedelta
 
 import voluptuous as vol
+import homeassistant.util.dt as dt_util
 
 from homeassistant.core import callback
 from homeassistant.helpers import device_registry as dr
@@ -134,6 +134,7 @@ CONFIG_SCHEMA = vol.Schema(
 )
 
 _LOGGER = logging.getLogger(__name__)
+SERVICE_REGISTRATION_KEY = f"{DOMAIN}_services_registered"
 
 INITIAL_SOC_RATIO = 0.5
 INITIAL_CHARGE_PERCENTAGE = 50
@@ -175,7 +176,7 @@ async def async_setup_entry(hass, entry) -> bool:
     
     _LOGGER.debug("Setup %s.%s", DOMAIN, entry.data[CONF_NAME])
 
-    handle = SimulatedBatteryHandle(entry.data, hass)
+    handle = SimulatedBatteryHandle(entry.data, hass, entry.entry_id)
     hass.data[DOMAIN][entry.entry_id] = handle
 
     # Register service
@@ -193,7 +194,7 @@ async def async_setup_entry(hass, entry) -> bool:
 
         # Match to correct handle by comparing identifiers
         for handle_entry in hass.data[DOMAIN].values():
-            if handle_entry.device_identifier in device.identifiers:
+            if handle_entry.matches_device_identifiers(device.identifiers):
                 handle_entry.async_set_battery_charge_state(state)
                 _LOGGER.debug("Battery charge updated for device %s", handle_entry._name)
                 break
@@ -212,32 +213,34 @@ async def async_setup_entry(hass, entry) -> bool:
             return
 
         for handle_entry in hass.data[DOMAIN].values():
-            if handle_entry.device_identifier in device.identifiers:
+            if handle_entry.matches_device_identifiers(device.identifiers):
                 handle_entry.async_set_battery_cycles(cycles)
                 _LOGGER.debug("Battery cycles updated for device %s", handle_entry._name)
                 break
         else:
             _LOGGER.error("No handle matched for device_id: %s", device_id)
 
-    hass.services.async_register(
-        DOMAIN,
-        "set_battery_charge_state",
-        handle_set_charge,
-        schema=vol.Schema({
-            vol.Required("device_id"): str,
-            vol.Required("charge_state"): vol.All(vol.Coerce(float), vol.Range(min=0))
-        }),
-    )
+    if not hass.data.get(SERVICE_REGISTRATION_KEY):
+        hass.services.async_register(
+            DOMAIN,
+            "set_battery_charge_state",
+            handle_set_charge,
+            schema=vol.Schema({
+                vol.Required("device_id"): str,
+                vol.Required("charge_state"): vol.All(vol.Coerce(float), vol.Range(min=0))
+            }),
+        )
 
-    hass.services.async_register(
-        DOMAIN,
-        "set_battery_cycles",
-        handle_set_cycles,
-        schema=vol.Schema({
-            vol.Required("device_id"): str,
-            vol.Required("battery_cycles"): vol.All(vol.Coerce(float), vol.Range(min=0))
-        }),
-    )
+        hass.services.async_register(
+            DOMAIN,
+            "set_battery_cycles",
+            handle_set_cycles,
+            schema=vol.Schema({
+                vol.Required("device_id"): str,
+                vol.Required("battery_cycles"): vol.All(vol.Coerce(float), vol.Range(min=0))
+            }),
+        )
+        hass.data[SERVICE_REGISTRATION_KEY] = True
 
     handle._listeners.append(entry.add_update_listener(async_update_settings))
 
@@ -277,7 +280,13 @@ async def async_unload_entry(hass, config_entry):
 
     _LOGGER.debug("Unload integration")
     if unload_ok:
-        hass.data[DOMAIN].pop(config_entry.entry_id)
+        if DOMAIN in hass.data:
+            hass.data[DOMAIN].pop(config_entry.entry_id, None)
+        if DOMAIN in hass.data and not hass.data[DOMAIN]:
+            hass.services.async_remove(DOMAIN, "set_battery_charge_state")
+            hass.services.async_remove(DOMAIN, "set_battery_cycles")
+            hass.data.pop(SERVICE_REGISTRATION_KEY, None)
+            hass.data.pop(DOMAIN, None)
 
     return unload_ok
 
@@ -292,16 +301,17 @@ class SimulatedBatteryHandle:
             return curve[0][1]
         return fallback
 
-    def __init__(self, config, hass):
+    def __init__(self, config, hass, entry_id=None):
         """Initialize the Battery."""
         self._hass = hass
-        self._date_recording_started = time.asctime()
+        self._entry_id = entry_id
+        self._date_recording_started = dt_util.now().isoformat()
         self._name = config[CONF_NAME]
         self.device_identifier = (DOMAIN, self._name)
         self._sensor_collection: list = []
         self._charging: bool = False
         self._accumulated_import_reading: float = 0.0
-        self._last_battery_update_time = time.time()
+        self._last_battery_update_time = dt_util.utcnow().timestamp()
         # Periodic update cadence (seconds). Falls back to 60 for backwards compatibility.
         self._update_frequency = config.get(CONF_UPDATE_FREQUENCY, 60)
         self._max_discharge: float = 0.0
@@ -314,8 +324,11 @@ class SimulatedBatteryHandle:
         self._charge_state: float = config[CONF_BATTERY_SIZE] * INITIAL_SOC_RATIO
         self._accumulated_export_reading: float = 0.0
         self._accumulated_solar_reading: float = 0.0
-        self._last_import_reading_sensor_data: str = None
-        self._last_export_reading_sensor_data: str = None
+        self._last_import_reading_sensor_data = None
+        self._last_export_reading_sensor_data = None
+        self._energy_saved_today: float = 0.0
+        self._energy_saved_week: float = 0.0
+        self._energy_saved_month: float = 0.0
         self._solar_entity_id = config.get(CONF_SOLAR_ENERGY_SENSOR)
         self._listeners = []
         self._pending_update_cancel = None
@@ -387,6 +400,19 @@ class SimulatedBatteryHandle:
             )
         )
 
+    @property
+    def device_identifier(self):
+        """Return a stable identifier tuple used for device registry linking."""
+        return (DOMAIN, self._entry_id or self._name)
+
+    def matches_device_identifiers(self, identifiers):
+        """Return true when any known identifier matches this handle."""
+        known_identifiers = {
+            self.device_identifier,
+            (DOMAIN, self._name),  # Backward compatibility for existing devices.
+        }
+        return bool(known_identifiers.intersection(identifiers))
+
     def async_set_battery_charge_state(self, state: float):
         """Reset the battery to start over."""
         _LOGGER.debug("Set battery charge state")
@@ -451,7 +477,7 @@ class SimulatedBatteryHandle:
         self._energy_saved_week = 0.0
         self._energy_saved_month = 0.0
 
-        self._date_recording_started = time.asctime()
+        self._date_recording_started = dt_util.now().isoformat()
         dispatcher_send(self._hass, f"{self._name}-{MESSAGE_TYPE_BATTERY_UPDATE}")
         return
 
@@ -579,11 +605,14 @@ class SimulatedBatteryHandle:
 
         if reading_variance < 0:
             _LOGGER.debug(
-                "(%s) %s sensor value decreased - meter may have been reset",
+                "(%s) %s sensor value decreased - rebasing simulated sensor %s",
                 self._name,
                 input_details[SENSOR_TYPE],
+                input_details[SIMULATED_SENSOR],
             )
             self._sensors[sensor_charge_rate] = 0
+            self._sensors[input_details[SIMULATED_SENSOR]] = new_state_value
+            dispatcher_send(self._hass, f"{self._name}-{MESSAGE_TYPE_BATTERY_UPDATE}")
             return
 
         if input_details[SENSOR_TYPE] == IMPORT:
@@ -691,7 +720,7 @@ class SimulatedBatteryHandle:
 
     def _async_maybe_update_battery(self):
         """Apply pending readings once the minimum update interval has elapsed."""
-        elapsed_seconds = time.time() - self._last_battery_update_time
+        elapsed_seconds = dt_util.utcnow().timestamp() - self._last_battery_update_time
         if elapsed_seconds < MINIMUM_UPDATE_INTERVAL_SECONDS:
             delay = MINIMUM_UPDATE_INTERVAL_SECONDS - elapsed_seconds
             if self._pending_update_cancel is None:
@@ -750,7 +779,7 @@ class SimulatedBatteryHandle:
             Calculate maximum possible charge and discharge based on battery
             specifications and time since last discharge
         """
-        time_now = time.time()
+        time_now = dt_util.utcnow().timestamp()
         time_last_update = self._last_battery_update_time
         time_since_last_battery_update = time_now - time_last_update
 
@@ -980,12 +1009,19 @@ class SimulatedBatteryHandle:
         else:
             self._sensors[ATTR_STATUS] = "Normal"
 
-        """Reset day/week/month counters"""
-        if time.strftime("%w") != time.strftime("%w", time.gmtime(time_last_update)):
+        # Reset day/week/month counters using Home Assistant's configured timezone.
+        now_local = dt_util.now()
+        last_update_local = dt_util.as_local(
+            dt_util.utc_from_timestamp(time_last_update)
+        )
+        if now_local.date() != last_update_local.date():
             self._energy_saved_today = 0
-        if time.strftime("%U") != time.strftime("%U", time.gmtime(time_last_update)):
+        if now_local.isocalendar()[:2] != last_update_local.isocalendar()[:2]:
             self._energy_saved_week = 0
-        if time.strftime("%m") != time.strftime("%m", time.gmtime(time_last_update)):
+        if (now_local.year, now_local.month) != (
+            last_update_local.year,
+            last_update_local.month,
+        ):
             self._energy_saved_month = 0
 
         self._last_battery_update_time = time_now
