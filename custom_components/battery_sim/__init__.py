@@ -297,6 +297,7 @@ class SimulatedBatteryHandle:
         self._hass = hass
         self._date_recording_started = time.asctime()
         self._name = config[CONF_NAME]
+        self.device_identifier = (DOMAIN, self._name)
         self._sensor_collection: list = []
         self._charging: bool = False
         self._accumulated_import_reading: float = 0.0
