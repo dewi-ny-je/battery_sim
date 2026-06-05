@@ -473,15 +473,17 @@ class SimulatedBatteryHandle:
         return bool(known_identifiers.intersection(identifiers))
 
     def _update_average_energy_value_sensor(self) -> None:
-        """Publish the average monetary value per kWh currently stored."""
-        charge_state = max(float(self._charge_state), 0.0)
-        if charge_state <= 0.000001:
+        """Publish the average value per kWh of dischargeable stored energy."""
+        dischargeable_energy = self._dischargeable_energy_for_charge_state(
+            self._charge_state
+        )
+        if dischargeable_energy <= 0.000001:
             self._stored_energy_value = 0.0
             self._sensors[ATTR_AVERAGE_ENERGY_VALUE] = 0.0
             return
 
         self._sensors[ATTR_AVERAGE_ENERGY_VALUE] = (
-            self._stored_energy_value / charge_state
+            self._stored_energy_value / dischargeable_energy
         )
 
     def _finalize_average_energy_value_restore(self) -> None:
@@ -490,10 +492,12 @@ class SimulatedBatteryHandle:
             return
 
         if self._pending_restored_average_energy_value is not None:
-            charge_state = max(float(self._charge_state), 0.0)
+            dischargeable_energy = self._dischargeable_energy_for_charge_state(
+                self._charge_state
+            )
             self._stored_energy_value = (
-                self._pending_restored_average_energy_value * charge_state
-                if charge_state > 0.000001
+                self._pending_restored_average_energy_value * dischargeable_energy
+                if dischargeable_energy > 0.000001
                 else 0.0
             )
             self._pending_restored_average_energy_value = None
@@ -512,17 +516,24 @@ class SimulatedBatteryHandle:
         degradation-driven capacity clipping, or a cycle-count update that
         reduces usable capacity.
         """
-        previous_charge_state = max(float(previous_charge_state), 0.0)
-        new_charge_state = max(float(new_charge_state), 0.0)
+        previous_dischargeable_energy = self._dischargeable_energy_for_charge_state(
+            previous_charge_state
+        )
+        new_dischargeable_energy = self._dischargeable_energy_for_charge_state(
+            new_charge_state
+        )
 
-        if new_charge_state <= 0.000001:
+        if new_dischargeable_energy <= 0.000001:
             self._stored_energy_value = 0.0
-        elif previous_charge_state > 0.000001:
-            self._stored_energy_value *= new_charge_state / previous_charge_state
+        elif previous_dischargeable_energy > 0.000001:
+            self._stored_energy_value *= (
+                new_dischargeable_energy / previous_dischargeable_energy
+            )
         else:
-            # There is no existing priced stored energy to preserve when the
-            # battery changes from empty to non-empty through an external SoC
-            # adjustment. Treat the newly introduced energy as unvalued.
+            # There is no existing priced dischargeable energy to preserve when
+            # the battery changes from below the minimum selectable SoC to above
+            # it through an external SoC adjustment. Treat the newly introduced
+            # energy as unvalued.
             self._stored_energy_value = 0.0
 
         self._update_average_energy_value_sensor()
@@ -908,6 +919,15 @@ class SimulatedBatteryHandle:
         """Return the configured minimum selectable SOC as a percentage."""
         return 100.0 * float(self._minimum_user_selectable_soc)
 
+    @property
+    def minimum_user_selectable_energy(self) -> float:
+        """Return the non-dischargeable energy floor in kWh."""
+        return self.current_max_capacity * float(self._minimum_user_selectable_soc)
+
+    def _dischargeable_energy_for_charge_state(self, charge_state: float) -> float:
+        """Return the portion of a charge state that can potentially discharge."""
+        return max(float(charge_state) - self.minimum_user_selectable_energy, 0.0)
+
     def update_battery(self, import_amount, export_amount, solar_amount=0.0):
         """Update battery statistics based on the reading for Im- or Export."""
         amount_to_charge: float = 0.0
@@ -1122,29 +1142,44 @@ class SimulatedBatteryHandle:
             + self._sensors[ATTR_MONEY_SAVED_EXPORT]
         )
 
-        # Track the monetary book value of the energy currently stored. Charge
-        # additions use the already-available tariff information: charging from
-        # exported energy has the opportunity cost of foregone export revenue,
-        # while grid-backed forced charging uses the import tariff.
+        # Track the monetary book value of the energy that can potentially be
+        # discharged. Energy below minimum_user_selectable_soc is excluded from
+        # this value model because it can never be discharged by the simulator.
+        dischargeable_energy_before_charge = self._dischargeable_energy_for_charge_state(
+            charge_state_before_update
+        )
+        charge_state_after_charge = (
+            charge_state_before_update + (amount_to_charge * charge_efficiency)
+        )
+        dischargeable_energy_after_charge = self._dischargeable_energy_for_charge_state(
+            charge_state_after_charge
+        )
+
         charge_value_increment = 0.0
         if amount_to_charge > 0.0:
-            charge_from_export = min(amount_to_charge, max(export_amount, 0.0))
-            charge_from_import = max(amount_to_charge - charge_from_export, 0.0)
+            chargeable_value_energy = max(
+                dischargeable_energy_after_charge - dischargeable_energy_before_charge,
+                0.0,
+            )
+            valued_charge_amount = min(
+                chargeable_value_energy / max(charge_efficiency, 0.000001),
+                amount_to_charge,
+            )
+            charge_from_export = min(valued_charge_amount, max(export_amount, 0.0))
+            charge_from_import = max(valued_charge_amount - charge_from_export, 0.0)
             if current_export_tariff is not None:
                 charge_value_increment += charge_from_export * current_export_tariff
             if current_import_tariff is not None:
                 charge_value_increment += charge_from_import * current_import_tariff
 
-        value_basis_energy_after_charge = (
-            charge_state_before_update + (amount_to_charge * charge_efficiency)
-        )
         retained_value_fraction = 1.0
-        if amount_to_discharge > 0.0 and value_basis_energy_after_charge > 0.000001:
+        if amount_to_discharge > 0.0 and dischargeable_energy_after_charge > 0.000001:
             # Follow the requested convention for this monetary sensor: value is
             # removed as if discharge were 100% efficient. This deliberately does
             # not apply the possibly load-dependent discharge efficiency.
             retained_value_fraction = max(
-                1.0 - (amount_to_discharge / value_basis_energy_after_charge), 0.0
+                1.0 - (amount_to_discharge / dischargeable_energy_after_charge),
+                0.0,
             )
 
         self._stored_energy_value = (

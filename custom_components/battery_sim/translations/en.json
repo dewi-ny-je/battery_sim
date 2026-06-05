@@ -198,8 +198,8 @@
       }
     },
     "set_stored_energy_value": {
-      "name": "Set Stored Energy Value",
-      "description": "Set the current total monetary value assigned to the energy stored in a specific simulated battery",
+      "name": "Set Dischargeable Stored Energy Value",
+      "description": "Set the current total monetary value assigned to the potentially dischargeable energy stored in a specific simulated battery",
       "fields": {
         "device_id": {
           "name": "Target Battery Device",
@@ -207,7 +207,7 @@
         },
         "stored_energy_value": {
           "name": "Stored Energy Value",
-          "description": "Total monetary value currently assigned to the energy stored in the battery"
+          "description": "Total monetary value currently assigned to the stored energy above minimum_user_selectable_soc"
         }
       }
     }

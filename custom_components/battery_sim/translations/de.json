@@ -198,8 +198,8 @@
       }
     },
     "set_stored_energy_value": {
-      "name": "Gespeicherten Energiewert setzen",
-      "description": "Setzt den aktuellen gesamten Geldwert der in einer bestimmten simulierten Batterie gespeicherten Energie",
+      "name": "Entladbaren gespeicherten Energiewert setzen",
+      "description": "Setzt den aktuellen gesamten Geldwert der potenziell entladbaren Energie in einer bestimmten simulierten Batterie",
       "fields": {
         "device_id": {
           "name": "Ziel-Batteriegerät",
@@ -207,7 +207,7 @@
         },
         "stored_energy_value": {
           "name": "Gespeicherter Energiewert",
-          "description": "Gesamter Geldwert, der aktuell der in der Batterie gespeicherten Energie zugeordnet ist"
+          "description": "Gesamter Geldwert, der aktuell der gespeicherten Energie oberhalb von minimum_user_selectable_soc zugeordnet ist"
         }
       }
     }

@@ -198,8 +198,8 @@
       }
     },
     "set_stored_energy_value": {
-      "name": "Opgeslagen energiewaarde instellen",
-      "description": "Stel de huidige totale geldwaarde in die is toegewezen aan de energie in een specifieke gesimuleerde batterij",
+      "name": "Ontlaadbare opgeslagen energiewaarde instellen",
+      "description": "Stel de huidige totale geldwaarde in die is toegewezen aan de potentieel ontlaadbare energie in een specifieke gesimuleerde batterij",
       "fields": {
         "device_id": {
           "name": "Doelbatterijapparaat",
@@ -207,7 +207,7 @@
         },
         "stored_energy_value": {
           "name": "Opgeslagen energiewaarde",
-          "description": "Totale geldwaarde die momenteel is toegewezen aan de energie die in de batterij is opgeslagen"
+          "description": "Totale geldwaarde die momenteel is toegewezen aan de opgeslagen energie boven minimum_user_selectable_soc"
         }
       }
     }

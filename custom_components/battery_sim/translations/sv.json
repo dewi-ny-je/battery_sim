@@ -198,8 +198,8 @@
       }
     },
     "set_stored_energy_value": {
-      "name": "Ange lagrat energivärde",
-      "description": "Ange det aktuella totala monetära värdet för energin som lagras i ett visst simulerat batteri",
+      "name": "Ange urladdningsbart lagrat energivärde",
+      "description": "Ange det aktuella totala monetära värdet för den potentiellt urladdningsbara energin som lagras i ett visst simulerat batteri",
       "fields": {
         "device_id": {
           "name": "Målenhet för batteri",
@@ -207,7 +207,7 @@
         },
         "stored_energy_value": {
           "name": "Lagrat energivärde",
-          "description": "Totalt monetärt värde som för närvarande tilldelas energin som lagras i batteriet"
+          "description": "Totalt monetärt värde som för närvarande tilldelas den lagrade energin över minimum_user_selectable_soc"
         }
       }
     }
